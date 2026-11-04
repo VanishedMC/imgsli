@@ -1,0 +1,17 @@
+.git
+.env
+.env.example
+docker-compose.yml
+node_modules
+vendor
+bootstrap/cache/*
+!bootstrap/cache/.gitignore
+storage/logs/*
+storage/app/public/*
+!storage/app/public/.gitignore
+public/storage
+tests
+phpunit.xml
+.phpunit.result.cache
+README.md
+.db-setup.sh

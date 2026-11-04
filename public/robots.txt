@@ -1,0 +1,7 @@
+# imgsli: the compare tool (/) and public albums (/a/…) may be crawled.
+# Private albums answer 404 to anyone but their owner, so they need no rule here.
+User-agent: *
+Disallow: /api/
+Disallow: /auth/
+Disallow: /mine
+Disallow: /logout

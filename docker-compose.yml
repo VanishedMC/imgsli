@@ -1,0 +1,78 @@
+# imgsli — production deployment (Docker Compose + Traefik).
+#
+#   Edge  : <CDN> -> traefik (app_net) -> web:80. Example: Cloudflare (proxied)
+#           -> traefik. The containers expose NO ports; traefik is the only
+#           ingress path.
+#   TLS   : terminate at your CDN or at the proxy. The example uses the proxy's
+#           default certificate (a file provider), so the router only needs the
+#           `tls` option (no certresolver).
+#   Data  : self-contained bind mounts under the app dir (no named volumes; the
+#           app dir is the whole footprint):
+#             ./db            MySQL data (mysql:8.4)
+#             ./storage/app   album images (STORAGE_DISK=local)
+#           Both are initialized/owned by the entrypoints on first boot.
+#   db    : off app_net (web reaches it over the private, internal
+#           imgsli_net), so no other app_net container can talk to MySQL.
+#
+#   Deploy: provide .env (see README), then: docker compose up -d --build
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: imgsli:latest
+    restart: unless-stopped
+    # The whole .env is the single source of truth for environment config
+    # (APP_URL, DISCORD_REDIRECT_URI, TRUSTED_PROXIES, DB_*, APP_ENV, ...).
+    # This file ships no environment-specific values — only .env does.
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Album images; the entrypoint ensures the dir exists and is
+      # www-data-owned (host state, not image state, once bind-mounted).
+      - ./storage/app:/var/www/html/storage/app
+    networks:
+      - app_net
+      - imgsli_net
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.imgsli.loadbalancer.server.port=80
+      - traefik.http.routers.imgsli.rule=Host(`${APP_HOST:?set APP_HOST in .env}`)
+      - traefik.http.routers.imgsli.entrypoints=websecure
+      - traefik.http.routers.imgsli.tls=
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      # Fail fast rather than defaulting: an empty DB_PASSWORD in .env must
+      # not silently desync the app's DB credentials from the db user.
+      # (The image also requires a root password even with MYSQL_USER set.)
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MYSQL_DATABASE: ${DB_DATABASE:-imgsli}
+      MYSQL_USER: ${DB_USERNAME:-imgsli}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # Healthcheck as the app user (no root password at all).
+    volumes:
+      # MySQL data dir; initialized + chowned by the mysql entrypoint.
+      - ./db:/var/lib/mysql
+    networks:
+      - imgsli_net
+    labels:
+      - traefik.enable=false
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+networks:
+  # Shared edge network the host's traefik lives on.
+  app_net:
+    external: true
+  # Private web<->db network; internal = no egress for the database.
+  imgsli_net:
+    internal: true

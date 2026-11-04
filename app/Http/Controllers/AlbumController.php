@@ -1,0 +1,186 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Album;
+use App\Services\RemoteImageFetcher;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use Throwable;
+
+class AlbumController extends Controller
+{
+    /**
+     * The compare tool (drop/pick or URL boxes + live slider + save).
+     */
+    public function compare(Request $request): View
+    {
+        $mine = collect();
+
+        if ($request->user()) {
+            $mine = Album::where('user_id', $request->user()->id)->latest()->get();
+        }
+
+        return view('compare', [
+            'mine' => $mine,
+            'public' => Album::where('is_public', true)->latest()->limit(12)->get(),
+        ]);
+    }
+
+    /**
+     * Album viewer: /a/{album} or /a/{album}/{before}/{after} (initial picker
+     * positions, mirroring the original site's URL shape).
+     */
+    public function show(Album $album, ?int $before = null, ?int $after = null): View
+    {
+        abort_unless($album->isViewableBy(auth()->user()), 404);
+
+        $count = count($album->images);
+        $clamp = fn (?int $i, int $default) => $i === null
+            ? $default
+            : min(max($i, 0), $count - 1);
+
+        return view('album', [
+            'album' => $album,
+            'urls' => $album->imageUrls(),
+            'before' => $clamp($before, 0),
+            'after' => $clamp($after, max($count - 1, 1)),
+        ]);
+    }
+
+    /**
+     * The user's albums (public + private) with delete buttons.
+     */
+    public function mine(Request $request): View
+    {
+        $albums = Album::where('user_id', $request->user()->id)->latest()->get();
+
+        return view('mine', ['albums' => $albums]);
+    }
+
+    /**
+     * API: create an album from a mixed file/URL list.
+     */
+    public function store(Request $request, RemoteImageFetcher $fetcher): JsonResponse
+    {
+        $minImages = (int) config('uploads.min_images');
+        $maxImages = (int) config('uploads.max_images');
+        $maxKb = intdiv((int) config('uploads.max_image_bytes'), 1024);
+
+        $validated = $request->validate([
+            'title' => ['nullable', 'string', 'max:200'],
+            'is_public' => ['sometimes', 'boolean'],
+            'images' => ['required', 'array', 'min:'.$minImages, 'max:'.$maxImages],
+            'images.*' => ['array'],
+            'images.*.file' => ['nullable', 'file', 'image:png,jpeg,gif,webp', 'max:'.$maxKb],
+            'images.*.url' => ['nullable', 'string', 'max:'.(int) config('uploads.max_url_length')],
+            'images.*.description' => ['nullable', 'string', 'max:200'],
+        ], [
+            'images.min' => "Add at least {$minImages} images.",
+            'images.max' => "Add at most {$maxImages} images.",
+            'images.*.file' => 'Image #:position must be a PNG, JPEG, GIF or WebP file.',
+            'images.*.file.max' => "Image #:position is too large (max {$fetcher->humanBytes()}).",
+        ]);
+
+        $images = [];
+        $dir = 'albums/'.$request->user()->id;
+        $disk = Storage::disk('public');
+        $written = [];
+        // Hard bound on the whole request: slow/dead hosts can pin a php-fpm
+        // worker for a long time, so the URL fetches share a total deadline
+        // (config: uploads.store_deadline, seconds).
+        $deadline = microtime(true) + (int) config('uploads.store_deadline');
+
+        // Any failure before the album row is committed (a rejected URL, a
+        // late validation error, even the DB write) leaves no orphans on
+        // the public disk.
+        try {
+            foreach ($validated['images'] as $i => $entry) {
+                $hasFile = isset($entry['file']);
+                $hasUrl = ! empty($entry['url'] ?? null);
+
+                if ($hasFile === $hasUrl) {
+                    throw ValidationException::withMessages([
+                        'images' => 'Each image needs exactly one source: a file or a URL.',
+                    ]);
+                }
+
+                if ($hasUrl) {
+                    [$bytes, $extension] = $fetcher->fetch($entry['url'], $deadline);
+                } else {
+                    /** @var UploadedFile $file */
+                    $file = $entry['file'];
+                    $extension = $file->guessExtension();
+                    $bytes = file_get_contents($file->getRealPath());
+                    if ($extension === 'bin') {
+                        $extension = 'jpg';
+                    }
+                }
+
+                $name = bin2hex(random_bytes(16)).'.'.$extension;
+                $disk->put($dir.'/'.$name, $bytes);
+                $written[] = $dir.'/'.$name;
+
+                $images[] = [
+                    'key' => $dir.'/'.$name,
+                    'description' => trim($entry['description'] ?? ''),
+                ];
+            }
+            $album = Album::create([
+                'user_id' => $request->user()->id,
+                'title' => $validated['title'] ?? null,
+                'is_public' => $validated['is_public'] ?? true,
+                'images' => $images,
+            ]);
+        } catch (Throwable $e) {
+            $disk->delete($written);
+
+            throw $e;
+        }
+
+        return response()->json(['id' => $album->id, 'url' => route('album', $album)], 201);
+    }
+
+    /**
+     * Toggle visibility: PATCH /api/albums/{album} with {is_public: bool}.
+     */
+    public function update(Request $request, Album $album): JsonResponse
+    {
+        if ($album->user_id !== $request->user()->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'is_public' => ['required', 'boolean'],
+        ]);
+
+        $album->update(['is_public' => $validated['is_public']]);
+
+        return response()->json([
+            'id' => $album->id,
+            'is_public' => $album->is_public,
+            'url' => route('album', $album),
+        ]);
+    }
+
+    /**
+     * API: delete an album and its stored files.
+     */
+    public function destroy(Request $request, Album $album): Response
+    {
+        if ($album->user_id !== $request->user()->id) {
+            abort(404);
+        }
+
+        $disk = Storage::disk('public');
+        $disk->delete(array_column($album->images, 'key'));
+        $album->delete();
+
+        return response()->noContent();
+    }
+}
