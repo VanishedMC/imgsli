@@ -52,7 +52,14 @@ class RemoteImageFetcher
      */
     public function humanBytes(): string
     {
-        $bytes = $this->maxBytes();
+        return self::humanBytesFor($this->maxBytes());
+    }
+
+    /**
+     * Human-readable byte count (KB/MB/GB) for error messages.
+     */
+    public static function humanBytesFor(int $bytes): string
+    {
         foreach ([['GB', 1073741824], ['MB', 1048576], ['KB', 1024]] as [$unit, $size]) {
             if ($bytes >= $size) {
                 return rtrim(rtrim(number_format($bytes / $size, 1), '0'), '.').' '.$unit;
@@ -79,12 +86,15 @@ class RemoteImageFetcher
     /**
      * @param  float|null  $deadline  Unix time (microtime) by which this fetch
      *                                must have finished; null = no deadline.
+     * @param  int|null    $maxBytesOverride  Per-call cap in bytes (e.g. an
+     *                                admin bypass); null = this->maxBytes().
      * @return array{0: string, 1: string} [bytes, extension]
      *
      * @throws ValidationException when the URL or its content is rejected
      */
-    public function fetch(string $url, ?float $deadline = null): array
+    public function fetch(string $url, ?float $deadline = null, ?int $maxBytesOverride = null): array
     {
+        $maxBytes = $maxBytesOverride ?? $this->maxBytes();
         $location = $url;
 
         for ($hop = 0; $hop <= $this->maxRedirects(); $hop++) {
@@ -139,11 +149,11 @@ class RemoteImageFetcher
             }
 
             $contentLength = $response->header('Content-Length');
-            if ($contentLength !== null && (int) $contentLength > $this->maxBytes()) {
-                throw $this->error('The image is too large (max '.$this->humanBytes().' MB).');
+            if ($contentLength !== null && (int) $contentLength > $maxBytes) {
+                throw $this->error('The image is too large (max '.self::humanBytesFor($maxBytes).').');
             }
 
-            $bytes = $this->readWithCap($response->body(), $this->maxBytes());
+            $bytes = $this->readWithCap($response->body(), $maxBytes);
 
             $type = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
             $extension = match ($type) {
@@ -209,7 +219,7 @@ class RemoteImageFetcher
     {
         if (is_string($body)) {
             if (strlen($body) > $maxBytes) {
-                throw $this->error('The image is too large (max '.$this->humanBytes().' MB).');
+                throw $this->error('The image is too large (max '.self::humanBytesFor($maxBytes).').');
             }
 
             return $body;
@@ -221,7 +231,7 @@ class RemoteImageFetcher
             $bytes .= $body->read(self::CHUNK_SIZE);
             if (strlen($bytes) > $maxBytes) {
                 $body->close();
-                throw $this->error('The image is too large (max '.$this->humanBytes().' MB).');
+                throw $this->error('The image is too large (max '.self::humanBytesFor($maxBytes).').');
             }
         }
 

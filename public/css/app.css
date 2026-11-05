@@ -375,3 +375,28 @@ progress {
     min-height: 0;
 }
 .compare-panel image-compare { width: 100%; min-height: 0; }
+
+/* ---- admin dashboard ---- */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.admin-table th, .admin-table td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+.admin-table th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.admin-table time { color: var(--muted); font-size: 12px; }
+.admin-panel-gap { margin-top: 16px; }
+.admin-avatar { vertical-align: middle; margin-right: 6px; border-radius: 50%; }
+.admin-badge { background: var(--accent); color: #fff; border-color: transparent; }
+.admin-private { background: #b45309; color: #fff; border-color: transparent; }

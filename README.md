@@ -34,7 +34,7 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Images | 2–8 per comparison |
 | Sources | local files (picked or dragged in) **or** image URLs |
 | Formats | PNG, JPEG, GIF, WebP |
-| Size | up to 10 MB per image |
+| Size | up to 10 MB per image (50 MB for admin users) |
 | Slider | live in the browser; drag the handle to compare; drag boxes to reorder |
 | Privacy | anonymous = 100% client-side, nothing leaves your browser |
 
@@ -68,7 +68,7 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | `GET /` | any | The compare tool. Logged in: title field, public/private toggle, save button. A "public albums" strip lists recent public albums. |
 | `GET /a/{album}` | public: any; private: owner | Album view — the component with the stored images. The owner gets a rename, a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
 | `GET /mine` | Discord | Your albums (public + private) with a rename, a public/private toggle and delete. |
-| `POST /api/albums` | Discord | Multipart: `title`, `is_public`, and per image `images[n].file` **or** `images[n].url` (2–8 images, png/jpg/gif/webp, ≤10 MB). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
+| `POST /api/albums` | Discord | Multipart: `title`, `is_public`, and per image `images[n].file` **or** `images[n].url` (2–8 images, png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
 | `PATCH /api/albums/{album}` | owner | JSON `{is_public: bool}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
 | `DELETE /api/albums/{album}` | owner | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
@@ -197,10 +197,12 @@ with local development).
 **Ops.** nginx logs are size-capped by logrotate. Upload limits (images per
 album, per-image size, URL length, redirect count, timeouts, rate limit) are
 centralized in `config/uploads.php` and tuned via the `UPLOAD_*` env vars
-(defaults: 2–8 images, 10 MB/image, 10/min). In Docker the entrypoint derives
-the nginx `client_max_body_size` and PHP `upload_max_filesize` /
-`post_max_size` from `UPLOAD_MAX_IMAGES` × `UPLOAD_MAX_IMAGE_BYTES`, so editing
-those two resizes the whole chain; `docker compose up -d` applies it.
+(defaults: 2–8 images, 10 MB/image, 10/min; admin users get a higher
+per-image cap, `UPLOAD_ADMIN_MAX_IMAGE_BYTES`, default 50 MB). In Docker the
+entrypoint derives the nginx `client_max_body_size` and PHP
+`upload_max_filesize` / `post_max_size` from `UPLOAD_MAX_IMAGES` × the higher
+of the regular and admin per-image caps, so editing those resizes the whole
+chain; `docker compose up -d` applies it.
 
 ### 3c. Docker development (dev machine)
 
@@ -284,6 +286,7 @@ variables:
 | `STORAGE_DISK` | `local` | `local` (server disk) or `s3` (bucket) for album images |
 | `UPLOAD_MIN_IMAGES` / `UPLOAD_MAX_IMAGES` | 2 / 8 | how many images per album |
 | `UPLOAD_MAX_IMAGE_BYTES` | `10485760` | per-image size cap, for file uploads **and** URL fetches |
+| `UPLOAD_ADMIN_MAX_IMAGE_BYTES` | `52428800` | per-image size cap for **admin** users (bypasses the regular cap; effective cap is the higher of the two) |
 | `UPLOAD_MAX_URL_LENGTH` | `2048` | max length of a pasted image URL |
 | `UPLOAD_STORE_RATE` | `10,1` | saves per minute per user |
 

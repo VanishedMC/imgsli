@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Auth is Discord OAuth; there is no `login` route. Guests hitting an
         // auth-protected route go to the Discord flow instead of a 500.
         $middleware->redirectGuestsTo(fn () => route('auth.discord'));
+
+        $middleware->alias([
+            'admin' => EnsureUserIsAdmin::class,
+        ]);
 
         // Production sits behind Cloudflare: trust only its published IP
         // ranges (TRUSTED_PROXIES) so Request::ip()/isSecure() see the real

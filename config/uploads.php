@@ -12,8 +12,8 @@
 |
 | The Docker entrypoint DERIVES the transport-layer caps (nginx
 | client_max_body_size and PHP upload_max_filesize / post_max_size) from
-| MAX_IMAGES and MAX_IMAGE_BYTES, so those always stay at/above the app caps
-| and a single UPLOAD_MAX_IMAGE_BYTES edit resizes the whole chain.
+| MAX_IMAGES and max(MAX_IMAGE_BYTES, ADMIN_MAX_IMAGE_BYTES), so they always
+| stay at/above the app caps and editing the caps resizes the whole chain.
 |
 */
 
@@ -25,6 +25,13 @@ return [
     // Per-image size cap in bytes, applied identically to file uploads and
     // to server-side URL fetches. Drives the derived nginx/PHP transport caps.
     'max_image_bytes' => (int) (env('UPLOAD_MAX_IMAGE_BYTES') ?: 10 * 1024 * 1024),
+
+    // Per-image size cap for admin users (bytes). Admins are exempt from the
+    // regular cap: their effective cap is max(max_image_bytes, this value),
+    // so a value below the regular cap is a no-op. The Docker entrypoint
+    // derives the transport caps from max(max_image_bytes, this value) so
+    // admin file uploads make it through PHP/nginx as well.
+    'admin_max_image_bytes' => (int) (env('UPLOAD_ADMIN_MAX_IMAGE_BYTES') ?: 50 * 1024 * 1024),
 
     // URL source: max length of the pasted URL string.
     'max_url_length' => (int) (env('UPLOAD_MAX_URL_LENGTH') ?: 2048),

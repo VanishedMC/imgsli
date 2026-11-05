@@ -21,6 +21,9 @@
     <nav class="site-nav">
         @auth
             <a href="{{ route('albums.mine') }}">My albums</a>
+            @if(auth()->user()->is_admin)
+                <a href="{{ route('admin.index') }}">Admin</a>
+            @endif
             <span class="who" title="{{ auth()->user()->username }}">
                 @if(auth()->user()->avatar_url)
                     <img src="{{ auth()->user()->avatar_url }}" alt="" width="24" height="24">

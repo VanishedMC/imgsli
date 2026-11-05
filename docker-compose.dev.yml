@@ -28,9 +28,11 @@ services:
       - storage_data:/var/www/html/storage/app
       # Source, live without rebuild. Read-only where the app never writes;
       # public/ stays rw because the entrypoint creates the public/storage
-      # symlink. bootstrap/ is NOT mounted: its cache dir must be writable
-      # (the app generates packages.php / services.php there at boot).
+      # symlink. bootstrap/ stays rw too: the app regenerates
+      # bootstrap/cache (packages.php / services.php) when the provider list
+      # or vendor packages go stale, so it must be writable at boot.
       - ./app:/var/www/html/app:ro
+      - ./bootstrap:/var/www/html/bootstrap
       - ./config:/var/www/html/config:ro
       - ./database:/var/www/html/database:ro
       - ./public:/var/www/html/public
@@ -67,6 +69,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/var/www/html/app:ro
+      # rw: the suite boots the app, which may regenerate bootstrap/cache.
+      - ./bootstrap:/var/www/html/bootstrap
       - ./config:/var/www/html/config:ro
       - ./database:/var/www/html/database:ro
       - ./public:/var/www/html/public:ro

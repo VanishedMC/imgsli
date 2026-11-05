@@ -15,4 +15,9 @@ class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    public function casts(): array
+    {
+        return ['is_admin' => 'boolean'];
+    }
 }

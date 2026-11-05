@@ -70,7 +70,16 @@ class AlbumController extends Controller
     {
         $minImages = (int) config('uploads.min_images');
         $maxImages = (int) config('uploads.max_images');
-        $maxKb = intdiv((int) config('uploads.max_image_bytes'), 1024);
+
+        // Admins bypass the regular per-image cap: their effective cap is
+        // max(regular, admin) so a lower admin value is a no-op. The same
+        // max() feeds the entrypoint's transport caps (config/uploads.php).
+        $user = $request->user();
+        $regularBytes = (int) config('uploads.max_image_bytes');
+        $maxBytes = $user->is_admin
+            ? max($regularBytes, (int) config('uploads.admin_max_image_bytes'))
+            : $regularBytes;
+        $maxKb = intdiv($maxBytes, 1024);
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
@@ -84,7 +93,7 @@ class AlbumController extends Controller
             'images.min' => "Add at least {$minImages} images.",
             'images.max' => "Add at most {$maxImages} images.",
             'images.*.file' => 'Image #:position must be a PNG, JPEG, GIF or WebP file.',
-            'images.*.file.max' => "Image #:position is too large (max {$fetcher->humanBytes()}).",
+            'images.*.file.max' => 'Image #:position is too large (max '.RemoteImageFetcher::humanBytesFor($maxBytes).').',
         ]);
 
         $images = [];
@@ -111,7 +120,13 @@ class AlbumController extends Controller
                 }
 
                 if ($hasUrl) {
-                    [$bytes, $extension] = $fetcher->fetch($entry['url'], $deadline);
+                    // null = the fetcher's own cap (config); admins get the
+                    // higher effective cap so oversized URL images pass.
+                    [$bytes, $extension] = $fetcher->fetch(
+                        $entry['url'],
+                        $deadline,
+                        $user->is_admin ? $maxBytes : null,
+                    );
                 } else {
                     /** @var UploadedFile $file */
                     $file = $entry['file'];

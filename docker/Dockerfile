@@ -35,10 +35,12 @@ COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/nginx/supervisord.conf
 COPY docker/logrotate.conf /etc/logrotate.d/nginx
 # Upload-limit defaults (the entrypoint rewrites this from the UPLOAD_* env
-# at container start; defaults mirror the entrypoint's: 8 images x 10 MiB).
-# Shipped pre-rendered so containers that skip the entrypoint (the compose
-# test runner) still get valid values instead of the __*_MAX__ placeholders.
-RUN printf 'upload_max_filesize = 12M\npost_max_size = 89M\n' \
+# at container start; defaults mirror the entrypoint's: transport caps
+# derived from the higher of the 10 MiB regular and 50 MiB admin per-image
+# caps). Shipped pre-rendered so containers that skip the entrypoint (the
+# compose test runner) still get valid values instead of __*_MAX__
+# placeholders.
+RUN printf 'upload_max_filesize = 52M\npost_max_size = 408M\n' \
     > /usr/local/etc/php/conf.d/99-imgsli-limits.ini
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
