@@ -2,6 +2,10 @@
 
 @section('title', 'Compare')
 
+@push('head')
+    <meta name="max-image-bytes" content="{{ $maxImageBytes }}">
+@endpush
+
 @section('content')
 <div class="page compare-page">
     <div id="slider-root">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Album;
+use App\Models\User;
 use App\Services\RemoteImageFetcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,23 @@ class AlbumController extends Controller
         return view('compare', [
             'mine' => $mine,
             'public' => Album::where('is_public', true)->latest()->limit(12)->get(),
+            // The client-side save checks mirror the server cap; admins get
+            // the higher effective one (see effectiveMaxImageBytes()).
+            'maxImageBytes' => $this->effectiveMaxImageBytes($request->user()),
         ]);
+    }
+
+    /**
+     * The effective per-image size cap (bytes) for a user: the regular cap,
+     * or for admins the higher of the regular and admin caps (bypass).
+     */
+    private function effectiveMaxImageBytes(?User $user): int
+    {
+        $regular = (int) config('uploads.max_image_bytes');
+
+        return $user?->is_admin
+            ? max($regular, (int) config('uploads.admin_max_image_bytes'))
+            : $regular;
     }
 
     /**
@@ -75,10 +92,7 @@ class AlbumController extends Controller
         // max(regular, admin) so a lower admin value is a no-op. The same
         // max() feeds the entrypoint's transport caps (config/uploads.php).
         $user = $request->user();
-        $regularBytes = (int) config('uploads.max_image_bytes');
-        $maxBytes = $user->is_admin
-            ? max($regularBytes, (int) config('uploads.admin_max_image_bytes'))
-            : $regularBytes;
+        $maxBytes = $this->effectiveMaxImageBytes($user);
         $maxKb = intdiv($maxBytes, 1024);
 
         $validated = $request->validate([

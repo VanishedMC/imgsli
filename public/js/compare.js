@@ -3,7 +3,13 @@
 (() => {
   const MIN = 2;
   const MAX = 8;
-  const MAX_MB = 10;
+  // Per-image size cap (bytes), set by the server in a meta tag — higher for
+  // admin users, who bypass the regular cap. Fallback: the default regular
+  // cap (10 MB).
+  const MAX_BYTES = Number(
+    document.querySelector('meta[name="max-image-bytes"]')?.content ||
+    10 * 1024 * 1024
+  );
   const TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   const BOX_DRAG_TYPE = 'application/x-imgsli-box';
   const WARN_MAX_SIDE = 12000; // px; a soft warning, the server has no dimension limit
@@ -85,8 +91,8 @@
       if (file) parts.push(formatBytes(file.size));
       info.textContent = parts.join(' · ');
 
-      if (file && file.size > MAX_MB * 1024 * 1024) {
-        items.push(`${name} is ${formatBytes(file.size)}; saving will be refused (limit ${MAX_MB} MB).`);
+      if (file && file.size > MAX_BYTES) {
+        items.push(`${name} is ${formatBytes(file.size)}; saving will be refused (limit ${formatBytes(MAX_BYTES)}).`);
       }
       if (loaded) {
         if (Math.max(w, h) > WARN_MAX_SIDE) items.push(`${name} is ${w} × ${h} px; very large images are slow to view.`);
@@ -542,8 +548,8 @@
         if (!TYPES.includes(s.file.type)) {
           errors.push(`${s.file.name}: not a PNG, JPEG, GIF or WebP.`);
         }
-        if (s.file.size > MAX_MB * 1024 * 1024) {
-          errors.push(`${s.file.name}: over ${MAX_MB} MB.`);
+        if (s.file.size > MAX_BYTES) {
+          errors.push(`${s.file.name}: over ${formatBytes(MAX_BYTES)}.`);
         }
       }
     }
