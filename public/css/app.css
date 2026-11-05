@@ -15,10 +15,16 @@
 
 * { box-sizing: border-box; }
 
-html { font-size: 100%; }
+html { height: 100%; font-size: 100%; }
 
+/* App shell: fixed viewport, the header keeps its height and <main> takes the
+   rest. Pages that fill the viewport (compare, album) never scroll the page;
+   lists that can grow (mine) scroll inside <main>. */
 body {
+    height: 100%;
     margin: 0;
+    display: flex;
+    flex-direction: column;
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -35,6 +41,7 @@ h2 { font-size: 19px; }
 /* ---- header ---- */
 .site-header {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 24px;
     padding: 10px 20px;
@@ -69,7 +76,13 @@ h2 { font-size: 19px; }
 form.inline { display: inline; }
 
 /* ---- layout ---- */
-main { padding: 24px; }
+main {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
 
 .page {
     max-width: 980px;
@@ -209,14 +222,44 @@ label.check {
     margin-bottom: 16px;
 }
 
-/* ---- slider ---- */
+/* ---- compare page: the slider owns the viewport, the controls sit in a
+   side column; nothing on the page scrolls (the side column scrolls itself). ---- */
+.compare-page {
+    max-width: none;
+    height: 100%;
+    overflow: hidden;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 16px;
+}
+
+/* The slider fills its grid cell; fit-height.js sizes the picture to exactly
+   the cell height minus the component toolbar (no viewport overflow). */
 #slider-root {
+    min-height: 0;
     border-radius: 8px;
     overflow: hidden;
 }
-/* <image-compare>: the picture fits this height, leaving room for the header and toolbar. */
+
+.compare-side {
+    min-height: 0;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Narrow viewports: stack, slider keeps the larger share; the side scrolls. */
+@media (max-width: 960px) {
+    main { padding: 12px; }
+    .compare-page {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+}
+
+/* ---- slider ---- */
 image-compare {
-    --image-compare-max-height: calc(100vh - 260px);
     --image-compare-accent: var(--accent);
 }
 .slider-hint {
@@ -285,6 +328,14 @@ progress {
 }
 
 /* ---- album page ---- */
+.album-page {
+    max-width: none;
+    height: 100%;
+    overflow: hidden;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 16px;
+}
+
 .album-head {
     display: flex;
     align-items: center;
@@ -293,4 +344,10 @@ progress {
 .album-head h1 { margin: 0; }
 .album-head .btn { margin-left: auto; }
 
-.album-page #compare { width: 100%; }
+/* The compare panel fills the viewport below the album head; fit-height.js
+   sizes the picture to the panel content height minus the toolbar. */
+.compare-panel {
+    display: grid;
+    min-height: 0;
+}
+.compare-panel image-compare { width: 100%; min-height: 0; }

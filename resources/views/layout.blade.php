@@ -40,6 +40,7 @@
     @yield('content')
 </main>
 <script src="{{ asset('image-compare.js?v=' . filemtime(public_path('image-compare.js'))) }}"></script>
+<script src="{{ asset('js/fit-height.js?v=' . filemtime(public_path('js/fit-height.js'))) }}"></script>
 @stack('scripts')
 </body>
 </html>

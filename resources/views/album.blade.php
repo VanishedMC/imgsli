@@ -11,7 +11,7 @@
             <button type="button" class="btn danger" id="delete-album" data-id="{{ $album->id }}">Delete</button>
         @endif
     </div>
-    <div class="panel">
+    <div class="panel compare-panel">
         <image-compare
             id="compare"
             title="{{ $album->title ?? '' }}"

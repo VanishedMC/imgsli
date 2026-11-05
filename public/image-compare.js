@@ -118,7 +118,6 @@ const STYLE = `
 .toolbar :focus-visible { outline: 2px solid #19c219; outline-offset: 1px; }
 .group { display: inline-flex; align-items: center; gap: 4px; }
 .modes { gap: 0; }
-.spacer { flex: 1 1 0; min-width: 0; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
   border: 0; border-radius: 3px; background: #3d4247; color: #fff; fill: #fff;
@@ -397,7 +396,6 @@ function template() {
     <select class="select mag-select" title="Magnification">${MAGNIFIER_ZOOMS.map((z) => `<option value="${z}"${z === 4 ? ' selected' : ''}>${z}×</option>`).join('')}</select>
   </div>
   <button type="button" class="btn labels-btn" aria-pressed="true" title="Show or hide the title and captions">${svg(TOOL_ICONS.labels)}<span>Labels</span></button>
-  <span class="spacer"></span>
   <button type="button" class="btn link-btn" title="Copy a link to this view" hidden>${svg(TOOL_ICONS.link)}<span>Copy link</span></button>
   <details class="menu">
     <summary class="btn" title="Download">${svg(TOOL_ICONS.download)}<span>Download</span></summary>
