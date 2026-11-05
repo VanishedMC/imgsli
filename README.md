@@ -80,8 +80,10 @@ reaches storage paths.
 
 ## Setup
 
-Two ways to run it: **local development** (fast iteration) or **Docker** (the
-production setup). Both use MySQL and a `.env` file. Discord login is only
+Three ways to run it: **local development** (fast iteration), **Docker
+production** (the deploy setup), or **Docker development** (the production
+stack with live code + in-container tests). All use MySQL and a `.env` file.
+Discord login is only
 needed if you want to *save* albums — the compare tool works without it.
 
 ### Prerequisites
@@ -201,6 +203,39 @@ the nginx `client_max_body_size` and PHP `upload_max_filesize` /
 `post_max_size` from `UPLOAD_MAX_IMAGES` × `UPLOAD_MAX_IMAGE_BYTES`, so editing
 those two resizes the whole chain; `docker compose up -d` applies it.
 
+### 3c. Docker development (dev machine)
+
+For developing on a machine without PHP/Composer installed. The repo ships
+the dev config in `docker-compose.dev.yml`; apply it on the dev machine by
+copying it to the (gitignored) override name, then start:
+
+```bash
+cp docker-compose.dev.yml docker-compose.override.yml
+docker compose up -d --build
+```
+
+- **Live code, no rebuilds.** `web` builds the same Dockerfile with the dev
+  dependencies (`COMPOSER_FLAGS=""` → PHPUnit, Mockery, …) and bind-mounts the
+  source tree, so file edits are live on the next request — Blade templates
+  recompile automatically, JS/CSS are served from `public/`. A rebuild is
+  only needed when `composer.json` / `composer.lock` / the Dockerfile change.
+- **Tests** run in a one-off service against a separate `imgsli_test`
+  database (created by `docker/db-init-test.sql` on first db init) — the app
+  database is never touched. `phpunit.xml` only fills env vars that aren't
+  already set, and the dev `.env` points at the app database, so the test
+  service sets its values explicitly:
+
+  ```bash
+  docker compose run --rm test                            # full suite
+  docker compose run --rm test vendor/bin/phpunit --filter AlbumVisibilityTest
+  ```
+
+- **Data.** The dev file keeps MySQL data and album images in named volumes
+  (`db_data`, `storage_data`) instead of the production file's `./db` /
+  `./storage/app` bind mounts, so the repo directory stays code-only.
+- **Never apply the dev file to a production host** — it bind-mounts the
+  working tree, so uncommitted edits would go live.
+
 ## Discord login (to save albums)
 
 Saving albums uses a Discord account via OAuth. To enable it:
@@ -262,7 +297,9 @@ All upload limits are centralized in `config/uploads.php` and driven by the
 `tests/Feature` (PHPUnit) cover page rendering (compare, album public/private
 access), album creation (file, URL, mixed), validation failures, URL-SSRF
 rejection, delete, and the Discord callback upsert. Run with `php artisan test`
-against a separate `imgsli_test` database (see `phpunit.xml`).
+against a separate `imgsli_test` database (see `phpunit.xml`) — or in the
+Docker dev setup, `docker compose run --rm test`
+([3c](#3c-docker-development-dev-machine)).
 
 ## Repo layout
 
@@ -271,8 +308,8 @@ app/ bootstrap/ config/ database/ public/ resources/ routes/ storage/
 public/image-compare.js          # the component (custom element <image-compare>)
 public/js/compare.js             # client app: image boxes, live render, save flow
 public/js/album.js               # album page wiring
-docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh
-docker-compose.yml
+docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sql
+docker-compose.yml docker-compose.dev.yml    # base (prod) + dev config
 tests/
 ```
 

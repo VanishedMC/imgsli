@@ -1,0 +1,91 @@
+# Local-development config (committed source of truth). On a dev machine,
+# make it apply by copying it to docker-compose.override.yml (gitignored) —
+# or point the local override at it with `include: [docker-compose.dev.yml]`.
+# Production deploys use the base docker-compose.yml only, with its bind
+# mounts; this file must never be applied there.
+#
+#   web   : dev image (full vendor, incl. dev deps) with the source code
+#           bind-mounted — file changes are live without a rebuild. A rebuild
+#           is only needed when composer.json / composer.lock / the Dockerfile
+#           change.
+#   test  : one-off PHPUnit runner (`docker compose run --rm test`); targets
+#           the imgsli_test database, never the app database.
+#   db    : named volume + a first-init script that also creates imgsli_test.
+#
+# Named volumes (not bind mounts) for the data dirs: bind mounts fail on
+# /mnt/d (Windows NTFS) because Docker containers can't chown/chmod there.
+services:
+  web:
+    build:
+      args:
+        # Full vendor (PHPUnit, Mockery, …) in the dev image.
+        COMPOSER_FLAGS: ""
+    image: imgsli-dev:latest
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    volumes:
+      - storage_data:/var/www/html/storage/app
+      # Source, live without rebuild. Read-only where the app never writes;
+      # public/ stays rw because the entrypoint creates the public/storage
+      # symlink. bootstrap/ is NOT mounted: its cache dir must be writable
+      # (the app generates packages.php / services.php there at boot).
+      - ./app:/var/www/html/app:ro
+      - ./config:/var/www/html/config:ro
+      - ./database:/var/www/html/database:ro
+      - ./public:/var/www/html/public
+      - ./resources:/var/www/html/resources:ro
+      - ./routes:/var/www/html/routes:ro
+      - ./artisan:/var/www/html/artisan:ro
+
+  test:
+    # profile = not started by a plain `docker compose up`; `compose run`
+    # ignores profiles, so `docker compose run --rm test` still works.
+    profiles: ["test"]
+    build:
+      args:
+        COMPOSER_FLAGS: ""
+    image: imgsli-dev:latest
+    # Skip the app entrypoint (migrate / storage:link) — the suite does its
+    # own migrations via RefreshDatabase.
+    entrypoint: php
+    command: vendor/bin/phpunit
+    env_file:
+      - .env
+    # .env points at the app database, and phpunit.xml only sets vars that
+    # aren't already in the environment — so the test values are explicit.
+    environment:
+      APP_ENV: testing
+      DB_DATABASE: imgsli_test
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      BROADCAST_CONNECTION: null
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/var/www/html/app:ro
+      - ./config:/var/www/html/config:ro
+      - ./database:/var/www/html/database:ro
+      - ./public:/var/www/html/public:ro
+      - ./resources:/var/www/html/resources:ro
+      - ./routes:/var/www/html/routes:ro
+      - ./tests:/var/www/html/tests:ro
+      - ./phpunit.xml:/var/www/html/phpunit.xml:ro
+      # storage/ is deliberately NOT mounted: the tests write to it (logs,
+      # compiled views, Storage::disk('public') files) and the image's empty
+      # writable copy is exactly what a clean run wants.
+    networks:
+      - imgsli_net
+
+  db:
+    volumes:
+      - db_data:/var/lib/mysql
+      # Creates imgsli_test on first db init (fresh data dir only).
+      - ./docker/db-init-test.sql:/docker-entrypoint-initdb.d/99-imgsli-test-db.sql:ro
+
+volumes:
+  db_data:
+  storage_data:

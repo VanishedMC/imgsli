@@ -1,4 +1,7 @@
 .git
+# Local MySQL data dir (the Docker deploy keeps its data in a named volume);
+# its socket file shows up as a Windows reparse point that breaks builds.
+db
 .env
 .env.example
 docker-compose.yml

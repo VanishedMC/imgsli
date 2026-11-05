@@ -23,11 +23,17 @@ NGINX_CONF=/etc/nginx/http.d/default.conf
 PHP_INI=/usr/local/etc/php/conf.d/99-imgsli-limits.ini
 
 sed -i "s/__MAX_BODY__/${POST_MIB}m/" "$NGINX_CONF"
-sed -i -e "s/__UPLOAD_MAX__/${FILE_MIB}M/" -e "s/__POST_MAX__/${POST_MIB}M/" "$PHP_INI"
+# The image ships pre-rendered defaults in the PHP ini (containers that skip
+# this entrypoint must still get valid values), so rewrite the whole file
+# rather than substituting placeholders.
+cat > "$PHP_INI" <<EOF
+upload_max_filesize = ${FILE_MIB}M
+post_max_size = ${POST_MIB}M
+EOF
 
-# Fail fast if a placeholder survived (template drift / missing file).
-if grep -qE '__MAX_BODY__|__UPLOAD_MAX__|__POST_MAX__' "$NGINX_CONF" "$PHP_INI"; then
-    echo "upload-limit placeholders left unrendered in $NGINX_CONF / $PHP_INI" >&2
+# Fail fast if the nginx template placeholder survived (drift / missing file).
+if grep -qE '__MAX_BODY__' "$NGINX_CONF"; then
+    echo "upload-limit placeholder left unrendered in $NGINX_CONF" >&2
     exit 1
 fi
 
