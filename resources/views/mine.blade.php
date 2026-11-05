@@ -34,5 +34,6 @@
 
 @push('scripts')
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="{{ asset('js/publicity.js?v=' . filemtime(public_path('js/publicity.js'))) }}"></script>
     <script src="{{ asset('js/mine.js?v=' . filemtime(public_path('js/mine.js'))) }}"></script>
 @endpush

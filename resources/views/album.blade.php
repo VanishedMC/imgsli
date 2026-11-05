@@ -6,9 +6,14 @@
 <div class="page album-page">
     <div class="panel album-head">
         <h1>{{ $album->title ?? 'Untitled' }}</h1>
-        @unless($album->is_public)<span class="badge">private</span>@endunless
         @if(auth()->user() && auth()->id() === $album->user_id)
-            <button type="button" class="btn danger" id="delete-album" data-id="{{ $album->id }}">Delete</button>
+            <div class="album-head-actions">
+                <label class="publicity">
+                    <input type="checkbox" class="publicity-toggle" data-id="{{ $album->id }}" @checked($album->is_public)>
+                    Public
+                </label>
+                <button type="button" class="btn danger" id="delete-album" data-id="{{ $album->id }}">Delete</button>
+            </div>
         @endif
     </div>
     <div class="panel compare-panel">
@@ -25,5 +30,6 @@
 
 @push('scripts')
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="{{ asset('js/publicity.js?v=' . filemtime(public_path('js/publicity.js'))) }}"></script>
     <script src="{{ asset('js/album.js?v=' . filemtime(public_path('js/album.js'))) }}"></script>
 @endpush

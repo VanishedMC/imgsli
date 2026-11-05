@@ -70,6 +70,25 @@ class AlbumVisibilityTest extends TestCase
             ->assertOk();
     }
 
+    public function test_album_page_shows_visibility_toggle_only_to_owner(): void
+    {
+        $owner = User::factory()->create();
+        $album = $this->makeAlbum(2, public: false, user: $owner);
+
+        $this->actingAs($owner)
+            ->get(route('album', $album))
+            ->assertOk()
+            ->assertSee('publicity-toggle', false);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('album', $album))->assertNotFound();
+
+        $public = $this->makeAlbum(2, public: true);
+        $this->get(route('album', $public))
+            ->assertOk()
+            ->assertDontSee('publicity-toggle', false);
+    }
+
     public function test_initial_picker_positions_from_url(): void
     {
         $album = $this->makeAlbum(4, public: true);

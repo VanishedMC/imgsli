@@ -1,37 +1,10 @@
-// imgsli — /mine: toggle album visibility (public/private) and delete albums.
-// The "Public" checkboxes post PATCH /api/albums/{album}; the new state is
-// kept on success, reverted on failure.
+// imgsli — /mine: delete albums. (The .publicity-toggle checkboxes are bound
+// by js/publicity.js, loaded first.)
 // Delete answers 204 No Content, which a plain form POST can't show (the
 // browser stays on the page with the album still listed), so the forms are
 // sent with fetch and the row is removed on success.
 (() => {
   const csrf = document.querySelector('meta[name=csrf-token]')?.content ?? '';
-
-  document.querySelectorAll('.publicity-toggle').forEach((input) => {
-    input.addEventListener('change', async () => {
-      const wanted = input.checked;
-      input.disabled = true;
-
-      const res = await fetch(`/api/albums/${input.dataset.id}`, {
-        method: 'PATCH',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': csrf,
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ is_public: wanted }),
-      });
-
-      if (res.ok) {
-        input.disabled = false;
-        return;
-      }
-      input.checked = !wanted; // revert
-      input.disabled = false;
-      alert('Visibility change failed (HTTP ' + res.status + ')');
-    });
-  });
 
   document.querySelectorAll('.album-list form').forEach((form) => {
     form.addEventListener('submit', async (e) => {

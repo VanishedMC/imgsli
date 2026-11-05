@@ -342,7 +342,12 @@ progress {
     gap: 12px;
 }
 .album-head h1 { margin: 0; }
-.album-head .btn { margin-left: auto; }
+.album-head-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
 
 /* The compare panel fills the viewport below the album head; fit-height.js
    sizes the picture to the panel content height minus the toolbar. */
