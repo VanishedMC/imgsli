@@ -42,6 +42,9 @@ class Album extends Model
 
     public function isViewableBy(?User $user): bool
     {
-        return $this->is_public || $user !== null && $this->user_id === $user->id;
+        // Admins manage all albums, so they can open any of them.
+        return $user?->is_admin === true
+            || $this->is_public
+            || ($user !== null && $this->user_id === $user->id);
     }
 }

@@ -167,9 +167,10 @@ class AlbumController extends Controller
      */
     public function update(Request $request, Album $album): JsonResponse
     {
-        if ($album->user_id !== $request->user()->id) {
-            abort(404);
-        }
+        $user = $request->user();
+        // Owners manage their albums; admins manage all of them. 404 (not
+        // 403) so album existence stays hidden from regular strangers.
+        abort_unless($album->user_id === $user->id || $user->is_admin, 404);
 
         $validated = $request->validate([
             'title' => ['sometimes', 'nullable', 'string', 'max:200'],
@@ -193,9 +194,9 @@ class AlbumController extends Controller
      */
     public function destroy(Request $request, Album $album): Response
     {
-        if ($album->user_id !== $request->user()->id) {
-            abort(404);
-        }
+        $user = $request->user();
+        // Owners manage their albums; admins manage all of them.
+        abort_unless($album->user_id === $user->id || $user->is_admin, 404);
 
         $disk = Storage::disk('public');
         $disk->delete(array_column($album->images, 'key'));

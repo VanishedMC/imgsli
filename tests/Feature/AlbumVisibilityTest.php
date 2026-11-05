@@ -68,9 +68,14 @@ class AlbumVisibilityTest extends TestCase
         $this->actingAs($owner)
             ->get(route('album', $album))
             ->assertOk();
+
+        // Admins manage all albums, so they can open them too.
+        $this->actingAs(User::factory()->create(['is_admin' => true]))
+            ->get(route('album', $album))
+            ->assertOk();
     }
 
-    public function test_album_page_shows_visibility_toggle_only_to_owner(): void
+    public function test_album_page_shows_actions_to_owner_and_admins_only(): void
     {
         $owner = User::factory()->create();
         $album = $this->makeAlbum(2, public: false, user: $owner);
@@ -79,6 +84,14 @@ class AlbumVisibilityTest extends TestCase
             ->get(route('album', $album))
             ->assertOk()
             ->assertSee('publicity-toggle', false);
+
+        // An admin can open the album and see the management actions.
+        $this->actingAs(User::factory()->create(['is_admin' => true]))
+            ->get(route('album', $album))
+            ->assertOk()
+            ->assertSee('publicity-toggle', false)
+            ->assertSee('rename-title', false)
+            ->assertSee('delete-album', false);
 
         $this->actingAs(User::factory()->create())
             ->get(route('album', $album))->assertNotFound();

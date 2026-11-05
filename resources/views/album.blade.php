@@ -6,7 +6,7 @@
 <div class="page album-page">
     <div class="panel album-head">
         <h1 class="album-title" data-id="{{ $album->id }}" data-value="{{ $album->title ?? '' }}" data-page-title>{{ $album->title ?? 'Untitled' }}</h1>
-        @if(auth()->user() && auth()->id() === $album->user_id)
+        @if(auth()->user() && (auth()->id() === $album->user_id || auth()->user()->is_admin))
             <div class="album-head-actions">
                 <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998; Rename</button>
                 <label class="publicity">

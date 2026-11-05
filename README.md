@@ -66,11 +66,11 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Method & path | Auth | What |
 |---|---|---|
 | `GET /` | any | The compare tool. Logged in: title field, public/private toggle, save button. A "public albums" strip lists recent public albums. |
-| `GET /a/{album}` | public: any; private: owner | Album view — the component with the stored images. The owner gets a rename, a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
+| `GET /a/{album}` | public: any; private: owner **or admin** | Album view — the component with the stored images. The owner — and any admin — gets a rename, a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
 | `GET /mine` | Discord | Your albums (public + private) with a rename, a public/private toggle and delete. |
 | `POST /api/albums` | Discord | Multipart: `title`, `is_public`, and per image `images[n].file` **or** `images[n].url` (2–8 images, png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
-| `PATCH /api/albums/{album}` | owner | JSON `{is_public: bool}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
-| `DELETE /api/albums/{album}` | owner | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
+| `PATCH /api/albums/{album}` | owner **or admin** | JSON `{is_public: bool}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
+| `DELETE /api/albums/{album}` | owner **or admin** | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
 | `POST /logout` | — | |
 
