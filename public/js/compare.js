@@ -7,6 +7,10 @@
   const TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   const BOX_DRAG_TYPE = 'application/x-imgsli-box';
   const WARN_MAX_SIDE = 12000; // px; a soft warning, the server has no dimension limit
+  // The first two boxes start with these demo images so the slider is live on
+  // load; they behave like any URL source (editable, clearable) but a page
+  // holding only untouched defaults is not "unsaved work" (no leave prompt).
+  const DEFAULT_IMAGES = ['/imgs/demo-before.webp', '/imgs/demo-after.webp'];
 
   const boxes = document.getElementById('boxes');
   const template = document.getElementById('box-template');
@@ -296,9 +300,16 @@
     box.querySelector('.dropzone').focus();
   }
 
+  /** A box still holding only its unmodified demo default counts as empty. */
+  const isUntouchedDefault = (box, n) =>
+    n < DEFAULT_IMAGES.length
+    && !fileInput(box).files.length
+    && urlInput(box).value === DEFAULT_IMAGES[n]
+    && !captionInput(box).value.trim();
+
   /** Fill empty boxes in order with the files, adding boxes as needed (up to MAX). */
   function fillBoxes(files, captionFor = () => true) {
-    const empties = allBoxes().filter((b) => !hasSource(b));
+    const empties = allBoxes().filter((b, n) => !hasSource(b) || isUntouchedDefault(b, n));
     for (const file of files) {
       const box = empties.shift() ?? addBox();
       if (!box) break;
@@ -483,9 +494,15 @@
     fillBoxes(named, (f) => !pasted.has(f));
   });
 
-  // Local images live only in this tab: confirm before leaving with any.
+  // Local images (or a non-default URL) live only in this tab: confirm before
+  // leaving with any. Untouched demo defaults don't count.
   window.addEventListener('beforeunload', (e) => {
-    if (leaving || !allBoxes().some(hasSource)) return;
+    if (leaving) return;
+    const unsaved = allBoxes().some((box) => {
+      const { file, url } = boxState(box);
+      return Boolean(file || (url && !DEFAULT_IMAGES.includes(url)));
+    });
+    if (!unsaved) return;
     e.preventDefault();
     e.returnValue = '';
   });
@@ -600,5 +617,11 @@
   saveBtn?.addEventListener('click', saveAlbum);
 
   // ---- init ----
+  // Prefill the first boxes with the demo images (the static boxes are always
+  // empty on load); the slider renders below immediately.
+  allBoxes().slice(0, DEFAULT_IMAGES.length).forEach((box, n) => {
+    urlInput(box).value = DEFAULT_IMAGES[n];
+    updatePreview(box);
+  });
   renderSlider();
 })();
