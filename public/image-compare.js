@@ -71,6 +71,7 @@ const BLINK_INTERVALS = [
 const MAGNIFIER_ZOOMS = [2, 4, 8];
 const ZOOM_MAX = 100;
 const TOGGLE_ZOOM = 3;
+const TAP_PAN_THRESHOLD = 5;
 const WHEEL_ZOOM_SPEED = 0.005;
 const KEY_STEP = 0.02;
 const DIFF_MAX_PIXELS = 2.5e6;
@@ -387,7 +388,7 @@ function template() {
   <div class="group modes">${MODES.map((m) => `<button type="button" class="btn" data-mode="${m.id}">${m.label}</button>`).join('')}</div>
   <button type="button" class="btn layout-btn" title="Switch between left/right and top/bottom">${svg(TOOL_ICONS.layout)}<span>Divider</span></button>
   <div class="group blink-group">
-    <button type="button" class="btn blink-btn" title="Show the other image (Space)">${svg(TOOL_ICONS.swap)}<span>Switch</span></button>
+    <button type="button" class="btn blink-btn" title="Show the other image (click or Space)">${svg(TOOL_ICONS.swap)}<span>Switch</span></button>
     <select class="select blink-select" title="Switch automatically">${BLINK_INTERVALS.map((o) => `<option value="${o.ms}">${o.label}</option>`).join('')}</select>
   </div>
   <label class="group range diff-group" title="Amplify differences"><span>Amplify</span><input class="amp" type="range" min="1" max="20" step="1"><output class="amp-out"></output></label>
@@ -1136,12 +1137,14 @@ class ImageCompare extends HTMLElement {
       this.#drag = { kind: 'split' };
       this.classList.add('sliding');
       this.#setPositionFromPointer(e.clientX, e.clientY);
-    } else if (this.#view.z > 1) {
-      this.#drag = { kind: 'pan', x: e.clientX, y: e.clientY };
-      this.classList.add('panning');
-    } else if (this.mode === 'blink') {
+    } else if (this.mode === 'blink' && this.#view.z === 1) {
       this.#toggleBlink();
       return;
+    } else if (this.#view.z > 1) {
+      // In blink mode a click without movement still switches the image:
+      // start as a pending toggle, commit to a pan once it moves.
+      this.#drag = { kind: 'pan', x: e.clientX, y: e.clientY, tap: this.mode === 'blink' };
+      if (!this.#drag.tap) this.classList.add('panning');
     } else {
       return;
     }
@@ -1156,6 +1159,17 @@ class ImageCompare extends HTMLElement {
       e.preventDefault();
       this.#setPositionFromPointer(e.clientX, e.clientY);
     } else if (this.#drag?.kind === 'pan') {
+      if (this.#drag.tap) {
+        if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) < TAP_PAN_THRESHOLD) {
+          this.#updateLens();
+          return;
+        }
+        // The blink click moved far enough: it is a pan, not a click.
+        this.#drag.tap = false;
+        this.#drag.x = e.clientX;
+        this.#drag.y = e.clientY;
+        this.classList.add('panning');
+      }
       e.preventDefault();
       const { w, h } = this.#paneSize();
       this.#view.cx -= (e.clientX - this.#drag.x) / (w * this.#view.z);
@@ -1169,9 +1183,11 @@ class ImageCompare extends HTMLElement {
 
   #onPointerUp() {
     if (!this.#drag) return;
+    const tap = this.#drag.tap;
     this.#drag = null;
     this.classList.remove('sliding', 'panning');
-    this.#userChange(() => {});
+    if (tap) this.#toggleBlink();
+    else this.#userChange(() => {});
   }
 
   /** Warm the cache with the images a picker is likely to switch to next. */
