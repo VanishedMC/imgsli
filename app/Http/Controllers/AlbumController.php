@@ -147,7 +147,8 @@ class AlbumController extends Controller
     }
 
     /**
-     * Toggle visibility: PATCH /api/albums/{album} with {is_public: bool}.
+     * Update: PATCH /api/albums/{album} with {is_public: bool} and/or
+     * {title} (rename; null clears the title).
      */
     public function update(Request $request, Album $album): JsonResponse
     {
@@ -156,13 +157,17 @@ class AlbumController extends Controller
         }
 
         $validated = $request->validate([
-            'is_public' => ['required', 'boolean'],
+            'title' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'is_public' => ['sometimes', 'boolean'],
         ]);
 
-        $album->update(['is_public' => $validated['is_public']]);
+        abort_if($validated === [], 422);
+
+        $album->update($validated);
 
         return response()->json([
             'id' => $album->id,
+            'title' => $album->title,
             'is_public' => $album->is_public,
             'url' => route('album', $album),
         ]);

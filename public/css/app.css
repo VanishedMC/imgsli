@@ -308,6 +308,25 @@ progress {
 .album-list time { color: var(--muted); font-size: 12px; }
 .album-list form.inline { margin-left: auto; }
 
+.rename-title {
+    padding: 2px 6px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+}
+.rename-title:hover { color: var(--accent); }
+.rename-input {
+    font: inherit;
+    color: inherit;
+    padding: 2px 6px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--bg);
+    width: min(240px, 60vw);
+}
+
 .publicity {
     display: inline-flex;
     align-items: center;

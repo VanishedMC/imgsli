@@ -331,6 +331,47 @@ class AlbumApiTest extends TestCase
         $this->assertDatabaseHas('albums', ['id' => $album->id, 'is_public' => false]);
     }
 
+    public function test_owner_renames_album(): void
+    {
+        $album = Album::create([
+            'user_id' => $this->user->id,
+            'title' => 'Before',
+            'is_public' => false,
+            'images' => [],
+        ]);
+        $stranger = User::factory()->create();
+
+        // rename
+        $this->actingAs($this->user)
+            ->patchJson(route('albums.update', $album), ['title' => 'After'])
+            ->assertStatus(200)
+            ->assertJsonPath('title', 'After');
+
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'title' => 'After']);
+
+        // rename + visibility in one patch
+        $this->actingAs($this->user)
+            ->patchJson(route('albums.update', $album), ['title' => 'Both', 'is_public' => true])
+            ->assertStatus(200)
+            ->assertJsonPath('title', 'Both')
+            ->assertJsonPath('is_public', true);
+
+        // clearing the title
+        $this->actingAs($this->user)
+            ->patchJson(route('albums.update', $album), ['title' => null])
+            ->assertStatus(200)
+            ->assertJsonPath('title', null);
+
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'title' => null]);
+
+        // non-owner cannot rename
+        $this->actingAs($stranger)
+            ->patchJson(route('albums.update', $album), ['title' => 'Hijack'])
+            ->assertStatus(404);
+
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'title' => null]);
+    }
+
     public function test_non_owner_cannot_toggle_visibility(): void
     {
         $album = Album::create([

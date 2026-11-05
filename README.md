@@ -24,8 +24,8 @@ Log in with Discord to save your comparisons as albums and share them by link.
 - **Share albums.** Every saved album gets a link. Mark it **public** to share
   it with anyone, or keep it **private** so only you can open it. Deep-link to
   a specific slider position with `/a/{album}/{before}/{after}`.
-- **Manage your albums.** you can toggle public/private and delete
-  (Images and titles can't be edited after saving — to change them, delete and re-upload.)
+- **Manage your albums.** Rename, toggle public/private, and delete
+  (Images can't be edited after saving — to change them, delete and re-upload.)
 
 ### The compare tool, at a glance
 
@@ -58,7 +58,7 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Database | MySQL 8.4 (Docker) / MariaDB (local, wire-compatible) |
 | Auth | `laravel/socialite` + Discord (required only to save albums) |
 | Storage | One Laravel disk `public`, driver from `STORAGE_DISK`: `local` or `s3` (see [Storage](#storage-local-vs-s3)) |
-| Frontend | Blade + vanilla JS (`public/js/compare.js`, `album.js`, `mine.js`, `publicity.js`) + the `image-compare` web component |
+| Frontend | Blade + vanilla JS (`public/js/compare.js`, `album.js`, `mine.js`, `publicity.js`, `rename.js`) + the `image-compare` web component |
 | Production | Docker image: nginx + php-fpm under supervisord, behind Traefik |
 
 ## Routes
@@ -66,11 +66,11 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Method & path | Auth | What |
 |---|---|---|
 | `GET /` | any | The compare tool. Logged in: title field, public/private toggle, save button. A "public albums" strip lists recent public albums. |
-| `GET /a/{album}` | public: any; private: owner | Album view — the component with the stored images. The owner gets a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
-| `GET /mine` | Discord | Your albums (public + private) with a public/private toggle and delete. |
+| `GET /a/{album}` | public: any; private: owner | Album view — the component with the stored images. The owner gets a rename, a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
+| `GET /mine` | Discord | Your albums (public + private) with a rename, a public/private toggle and delete. |
 | `POST /api/albums` | Discord | Multipart: `title`, `is_public`, and per image `images[n].file` **or** `images[n].url` (2–8 images, png/jpg/gif/webp, ≤10 MB). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
-| `PATCH /api/albums/{album}` | owner | JSON `{is_public: bool}` — toggle visibility. |
-| `DELETE /api/albums/{album}` | owner | Deletes the album and its stored files. Images and title are immutable; editing = delete + re-upload (visibility is togglable). |
+| `PATCH /api/albums/{album}` | owner | JSON `{is_public: bool}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
+| `DELETE /api/albums/{album}` | owner | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
 | `POST /logout` | — | |
 
@@ -295,7 +295,7 @@ All upload limits are centralized in `config/uploads.php` and driven by the
 
 `tests/Feature` (PHPUnit) cover page rendering (compare, album public/private
 access), album creation (file, URL, mixed), validation failures, URL-SSRF
-rejection, delete, and the Discord callback upsert. Run with `php artisan test`
+rejection, rename, delete, and the Discord callback upsert. Run with `php artisan test`
 against a separate `imgsli_test` database (see `phpunit.xml`) — or in the
 Docker dev setup, `docker compose run --rm test`
 ([3c](#3c-docker-development-dev-machine)).
@@ -308,6 +308,7 @@ public/image-compare.js          # the component (custom element <image-compare>
 public/js/compare.js             # client app: image boxes, live render, save flow
 public/js/album.js               # album page wiring
 public/js/publicity.js           # shared public/private toggle (mine + album)
+public/js/rename.js              # shared inline rename (mine + album)
 docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sql
 docker-compose.yml docker-compose.dev.yml    # base (prod) + dev config
 tests/

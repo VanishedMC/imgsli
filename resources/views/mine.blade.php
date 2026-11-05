@@ -12,7 +12,9 @@
             <ul class="album-list">
                 @foreach($albums as $album)
                     <li>
-                        <a href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
+                        <a class="album-title" data-id="{{ $album->id }}" data-value="{{ $album->title ?? '' }}"
+                           href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
+                        <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998;</button>
                         <label class="publicity">
                             <input type="checkbox" class="publicity-toggle" data-id="{{ $album->id }}" @checked($album->is_public)>
                             Public
@@ -35,5 +37,6 @@
 @push('scripts')
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="{{ asset('js/publicity.js?v=' . filemtime(public_path('js/publicity.js'))) }}"></script>
+    <script src="{{ asset('js/rename.js?v=' . filemtime(public_path('js/rename.js'))) }}"></script>
     <script src="{{ asset('js/mine.js?v=' . filemtime(public_path('js/mine.js'))) }}"></script>
 @endpush
