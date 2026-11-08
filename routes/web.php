@@ -24,6 +24,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:'.config('uploads.store_rate'))
         ->name('albums.store');
     Route::patch('/api/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
+    Route::put('/api/albums/{album}/images', [AlbumController::class, 'updateImages'])
+        ->middleware('throttle:'.config('uploads.store_rate'))
+        ->name('albums.images.update');
     Route::delete('/api/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
 });
 

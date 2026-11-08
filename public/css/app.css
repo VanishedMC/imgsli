@@ -371,6 +371,7 @@ progress {
 
 .album-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
 }
@@ -381,6 +382,66 @@ progress {
     align-items: center;
     gap: 12px;
 }
+
+.album-edit {
+    flex-basis: 100%;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 12px;
+}
+.album-edit-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.album-edit-head h2 { margin: 0; font-size: 15px; }
+.album-edit-head .btn { margin-left: auto; }
+.edit-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 0;
+    margin: 12px 0;
+}
+.edit-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.edit-item img {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #1b2024;
+}
+.edit-caption {
+    font-size: 11px;
+    color: var(--muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.edit-item .clear {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 0 6px;
+    background: rgba(0, 0, 0, .65);
+}
+.edit-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.edit-add label.btn { cursor: pointer; }
+.edit-add label.btn input { display: none; }
+.edit-add input[type=url] { flex: 1 1 240px; width: auto; }
+.edit-actions { margin-top: 10px; }
 
 /* The compare panel fills the viewport below the album head; fit-height.js
    sizes the picture to the panel content height minus the toolbar. */

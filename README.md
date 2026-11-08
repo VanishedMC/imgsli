@@ -25,8 +25,9 @@ Log in with Discord to save your comparisons as albums and share them by link.
   it on the home page, **unlisted** to keep it reachable by URL only, or
   **private** so only you can open it. Deep-link to a specific slider position
   with `/a/{album}/{before}/{after}`.
-- **Manage your albums.** Rename, switch between public/unlisted/private, and delete
-  (Images can't be edited after saving — to change them, delete and re-upload.)
+- **Manage your albums.** Rename, switch between public/unlisted/private,
+  edit the images (add and/or remove, within the same count and size limits),
+  and delete.
 
 ### The compare tool, at a glance
 
@@ -37,6 +38,7 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Formats | PNG, JPEG, GIF, WebP |
 | Size | up to 10 MB per image (50 MB for admin users) |
 | Visibility | **public** (listed on the home page), **unlisted** (URL only), **private** (owner/admin only) |
+| Editing | add or remove images later (same 2–8 / 16 count and size limits); kept images are not re-uploaded |
 | Slider | live in the browser; drag the handle to compare; drag boxes to reorder |
 | Privacy | anonymous = 100% client-side, nothing leaves your browser |
 
@@ -72,7 +74,8 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | `GET /mine` | Discord | Your albums (all visibilities) with a rename, a visibility picker and delete. |
 | `POST /api/albums` | Discord | Multipart: `title`, `visibility` (`public` default, `unlisted`, `private`), and per image `images[n].file` **or** `images[n].url` (2–8 images, 16 for admin users; png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
 | `PATCH /api/albums/{album}` | owner **or admin** | JSON `{visibility: "public" | "unlisted" | "private"}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
-| `DELETE /api/albums/{album}` | owner **or admin** | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
+| `PUT /api/albums/{album}/images` | owner **or admin** | Multipart: replaces the image list. Each entry is `images[n].key` (keep an existing image), **or** `images[n].file` / `images[n].url` (new); `images[n].description` sets the caption. Count/size limits apply as on create; removed files are deleted. |
+| `DELETE /api/albums/{album}` | owner **or admin** | Deletes the album and its stored files. |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
 | `POST /logout` | — | |
 
@@ -301,7 +304,8 @@ All upload limits are centralized in `config/uploads.php` and driven by the
 ## Tests
 
 `tests/Feature` (PHPUnit) cover page rendering (compare; public, unlisted and
-private album access), album creation (file, URL, mixed), validation failures, URL-SSRF
+private album access), album creation (file, URL, mixed), image editing
+(add/remove by key, files and URLs), validation failures, URL-SSRF
 rejection, rename, delete, and the Discord callback upsert. Run with `php artisan test`
 against a separate `imgsli_test` database (see `phpunit.xml`) — or in the
 Docker dev setup, `docker compose run --rm test`
@@ -314,6 +318,7 @@ app/ bootstrap/ config/ database/ public/ resources/ routes/ storage/
 public/image-compare.js          # the component (custom element <image-compare>)
 public/js/compare.js             # client app: image boxes, live render, save flow
 public/js/album.js               # album page wiring
+public/js/album-edit.js          # add/remove images (owner/admin)
 public/js/publicity.js           # shared visibility picker (mine + album)
 public/js/rename.js              # shared inline rename (mine + album)
 docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sql
