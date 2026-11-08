@@ -24,7 +24,10 @@ class DiscordController extends Controller
         $user->avatar_url = $discord->avatar_url ?: $discord->avatar;
         $user->save();
 
-        Auth::login($user);
+        // Persistent login: the remember cookie lets the guard re-establish
+        // a session after the session cookie's idle window expires, so users
+        // do not have to redo the Discord OAuth round trip.
+        Auth::login($user, true);
         // New session ID on auth: a pre-login session cannot be pinned
         // (session fixation).
         $request->session()->regenerate();
