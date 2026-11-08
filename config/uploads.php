@@ -12,8 +12,9 @@
 |
 | The Docker entrypoint DERIVES the transport-layer caps (nginx
 | client_max_body_size and PHP upload_max_filesize / post_max_size) from
-| MAX_IMAGES and max(MAX_IMAGE_BYTES, ADMIN_MAX_IMAGE_BYTES), so they always
-| stay at/above the app caps and editing the caps resizes the whole chain.
+| max(MAX_IMAGES, ADMIN_MAX_IMAGES) and max(MAX_IMAGE_BYTES,
+| ADMIN_MAX_IMAGE_BYTES), so they always stay at/above the app caps and
+| editing the caps resizes the whole chain.
 |
 */
 
@@ -21,6 +22,12 @@ return [
     // How many images an album may contain.
     'min_images' => (int) (env('UPLOAD_MIN_IMAGES') ?: 2),
     'max_images' => (int) (env('UPLOAD_MAX_IMAGES') ?: 8),
+
+    // Per-album image count for admin users. Like the per-image cap, admins
+    // are exempt from the regular count: their effective limit is
+    // max(max_images, this value), so a lower value is a no-op. The Docker
+    // entrypoint sizes the whole-POST transport caps from the higher count.
+    'admin_max_images' => (int) (env('UPLOAD_ADMIN_MAX_IMAGES') ?: 16),
 
     // Per-image size cap in bytes, applied identically to file uploads and
     // to server-side URL fetches. Drives the derived nginx/PHP transport caps.

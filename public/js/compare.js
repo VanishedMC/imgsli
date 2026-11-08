@@ -1,8 +1,12 @@
-// imgsli compare tool — 2–8 image boxes (pick/drag/paste or URL) with captions,
+// imgsli compare tool — 2+ image boxes (pick/drag/paste or URL) with captions,
 // reordering, live <image-compare> rendering, and save-as-album (XHR with progress).
 (() => {
   const MIN = 2;
-  const MAX = 8;
+  // Per-album image count, set by the server in a meta tag — higher for admin
+  // users, who bypass the regular limit. Fallback: the default regular limit.
+  const MAX = Number(
+    document.querySelector('meta[name="max-images"]')?.content || 8
+  );
   // Per-image size cap (bytes), set by the server in a meta tag — higher for
   // admin users, who bypass the regular cap. Fallback: the default regular
   // cap (10 MB).

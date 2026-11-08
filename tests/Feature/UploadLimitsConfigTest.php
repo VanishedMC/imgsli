@@ -110,4 +110,25 @@ class UploadLimitsConfigTest extends TestCase
         $this->actingAs($this->user)->get('/')->assertSee('<meta name="max-image-bytes" content="1024">', false);
         $this->actingAs($admin)->get('/')->assertSee('<meta name="max-image-bytes" content="2048">', false);
     }
+
+    /**
+     * The compare page exposes the EFFECTIVE image count (admin bypass
+     * included) so the client-side box limit mirrors the server's.
+     */
+    public function test_compare_page_exposes_effective_max_images(): void
+    {
+        // Defaults: 8 for guests and regular users, 16 for admins.
+        $this->get('/')->assertSee('<meta name="max-images" content="8">', false);
+        $this->actingAs($this->user)->get('/')->assertSee('<meta name="max-images" content="8">', false);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)->get('/')->assertSee('<meta name="max-images" content="16">', false);
+
+        // Config-driven: overrides change what each role sees.
+        config(['uploads.max_images' => 3, 'uploads.admin_max_images' => 5]);
+        $this->app['auth']->guard()->logout();
+        $this->get('/')->assertSee('<meta name="max-images" content="3">', false);
+        $this->actingAs($this->user)->get('/')->assertSee('<meta name="max-images" content="3">', false);
+        $this->actingAs($admin)->get('/')->assertSee('<meta name="max-images" content="5">', false);
+    }
 }

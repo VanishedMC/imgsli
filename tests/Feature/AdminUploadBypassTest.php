@@ -109,6 +109,30 @@ class AdminUploadBypassTest extends TestCase
         );
     }
 
+    public function test_admin_album_image_count_bypasses_regular_limit(): void
+    {
+        config(['uploads.max_images' => 2, 'uploads.admin_max_images' => 3]);
+        $png = $this->noisyPng();
+        $images = array_map(
+            fn (int $n) => ['file' => UploadedFile::fake()->createWithContent("i{$n}.png", $png, ['mime' => 'image/png'])],
+            range(1, 4),
+        );
+        $three = array_slice($images, 0, 3);
+
+        // Regular user: rejected above the regular count, dynamic message.
+        $response = $this->postAs($this->user, $three);
+        $response->assertStatus(422)->assertJsonValidationErrors(['images']);
+        $this->assertSame('Add at most 2 images.', $response->json('errors.images.0'));
+
+        // Admin: the same three images pass.
+        $this->postAs($this->admin, $three)->assertStatus(201);
+
+        // Admin is still bounded by the admin count.
+        $response = $this->postAs($this->admin, $images);
+        $response->assertStatus(422)->assertJsonValidationErrors(['images']);
+        $this->assertSame('Add at most 3 images.', $response->json('errors.images.0'));
+    }
+
     public function test_admin_url_fetch_bypasses_regular_cap(): void
     {
         $png = $this->noisyPng();

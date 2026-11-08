@@ -37,10 +37,10 @@ COPY docker/logrotate.conf /etc/logrotate.d/nginx
 # Upload-limit defaults (the entrypoint rewrites this from the UPLOAD_* env
 # at container start; defaults mirror the entrypoint's: transport caps
 # derived from the higher of the 10 MiB regular and 50 MiB admin per-image
-# caps). Shipped pre-rendered so containers that skip the entrypoint (the
-# compose test runner) still get valid values instead of __*_MAX__
-# placeholders.
-RUN printf 'upload_max_filesize = 52M\npost_max_size = 408M\n' \
+# caps, and the higher of the 8 regular and 16 admin per-album counts).
+# Shipped pre-rendered so containers that skip the entrypoint (the compose
+# test runner) still get valid values instead of __*_MAX__ placeholders.
+RUN printf 'upload_max_filesize = 52M\npost_max_size = 808M\n' \
     > /usr/local/etc/php/conf.d/99-imgsli-limits.ini
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

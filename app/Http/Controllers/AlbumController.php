@@ -30,9 +30,11 @@ class AlbumController extends Controller
         return view('compare', [
             'mine' => $mine,
             'public' => Album::where('is_public', true)->latest()->limit(12)->get(),
-            // The client-side save checks mirror the server cap; admins get
-            // the higher effective one (see effectiveMaxImageBytes()).
+            // The client-side save checks mirror the server caps; admins get
+            // the higher effective ones (see effectiveMaxImageBytes() /
+            // effectiveMaxImages()).
             'maxImageBytes' => $this->effectiveMaxImageBytes($request->user()),
+            'maxImages' => $this->effectiveMaxImages($request->user()),
         ]);
     }
 
@@ -46,6 +48,19 @@ class AlbumController extends Controller
 
         return $user?->is_admin
             ? max($regular, (int) config('uploads.admin_max_image_bytes'))
+            : $regular;
+    }
+
+    /**
+     * The effective per-album image count for a user: the regular limit, or
+     * for admins the higher of the regular and admin limits (bypass).
+     */
+    private function effectiveMaxImages(?User $user): int
+    {
+        $regular = (int) config('uploads.max_images');
+
+        return $user?->is_admin
+            ? max($regular, (int) config('uploads.admin_max_images'))
             : $regular;
     }
 
@@ -86,12 +101,13 @@ class AlbumController extends Controller
     public function store(Request $request, RemoteImageFetcher $fetcher): JsonResponse
     {
         $minImages = (int) config('uploads.min_images');
-        $maxImages = (int) config('uploads.max_images');
 
-        // Admins bypass the regular per-image cap: their effective cap is
-        // max(regular, admin) so a lower admin value is a no-op. The same
-        // max() feeds the entrypoint's transport caps (config/uploads.php).
+        // Admins bypass the regular per-image and per-album caps: their
+        // effective values are max(regular, admin) so a lower admin value is
+        // a no-op. The same max() feeds the entrypoint's transport caps
+        // (config/uploads.php).
         $user = $request->user();
+        $maxImages = $this->effectiveMaxImages($user);
         $maxBytes = $this->effectiveMaxImageBytes($user);
         $maxKb = intdiv($maxBytes, 1024);
 

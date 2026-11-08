@@ -4,6 +4,7 @@
 
 @push('head')
     <meta name="max-image-bytes" content="{{ $maxImageBytes }}">
+    <meta name="max-images" content="{{ $maxImages }}">
 @endpush
 
 @section('content')
@@ -16,7 +17,7 @@
         <div class="panel">
             <h1>Compare</h1>
             <p class="hint">
-                Drop, paste (Ctrl+V) or pick 2–8 images, or paste URLs; drag a box's grip to reorder.
+                Drop, paste (Ctrl+V) or pick {{ config('uploads.min_images') }}–{{ $maxImages }} images, or paste URLs; drag a box's grip to reorder.
                 Files stay in your browser — nothing is uploaded unless you save.
             </p>
 
@@ -29,8 +30,8 @@
                         </div>
                         <div class="box-info"></div>
                         <input type="file" accept="image/png,image/jpeg,image/gif,image/webp">
-                        <input type="url" class="url-input" placeholder="… or paste an image URL">
                         <input type="text" class="caption-input" maxlength="200" placeholder="Caption (optional)">
+                        <input type="url" class="url-input" placeholder="… or paste an image URL">
                         <button type="button" class="btn clear" title="Clear box">× clear</button>
                         <button type="button" class="box-grip" title="Drag to reorder, or use the arrow keys" aria-label="Move image {{ $i + 1 }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h3v3H8zM13 4h3v3h-3zM8 10.5h3v3H8zM13 10.5h3v3h-3zM8 17h3v3H8zM13 17h3v3h-3z"/></svg></button>
                     </div>
@@ -43,8 +44,8 @@
                         </div>
                         <div class="box-info"></div>
                         <input type="file" accept="image/png,image/jpeg,image/gif,image/webp">
-                        <input type="url" class="url-input" placeholder="… or paste an image URL">
                         <input type="text" class="caption-input" maxlength="200" placeholder="Caption (optional)">
+                        <input type="url" class="url-input" placeholder="… or paste an image URL">
                         <button type="button" class="btn clear" title="Clear box">× clear</button>
                         <button type="button" class="box-grip" title="Drag to reorder, or use the arrow keys" aria-label="Move image"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h3v3H8zM13 4h3v3h-3zM8 10.5h3v3H8zM13 10.5h3v3h-3zM8 17h3v3H8zM13 17h3v3h-3z"/></svg></button>
                     </div>
