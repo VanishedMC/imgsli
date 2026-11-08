@@ -64,9 +64,13 @@
             @auth
                 <h2>Save</h2>
                 <input type="text" id="album-title" maxlength="200" placeholder="Title">
-                <label class="check">
-                    <input type="checkbox" id="album-public" checked>
-                    Save public
+                <label class="check" for="album-visibility">
+                    Visibility
+                    <select id="album-visibility">
+                        <option value="public" selected>Public — listed on the homepage</option>
+                        <option value="unlisted">Unlisted — link only</option>
+                        <option value="private">Private — only me</option>
+                    </select>
                 </label>
                 <button type="button" class="btn primary" id="save-btn">Save album</button>
                 <div class="progress-row">
@@ -76,7 +80,7 @@
                 <ul id="save-errors" class="errors" role="alert"></ul>
             @else
                 <h2>Save</h2>
-                <p>Log in with Discord to save your comparisons (public or private).</p>
+                <p>Log in with Discord to save your comparisons (public, unlisted or private).</p>
                 <a class="btn primary" href="{{ route('auth.discord') }}">Log in with Discord</a>
             @endauth
         </div>
@@ -88,7 +92,9 @@
                     @foreach($mine as $album)
                         <li>
                             <a href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
-                            @unless($album->is_public)<span class="badge">private</span>@endunless
+                            @unless($album->visibility === \App\Models\Album::VISIBILITY_PUBLIC)
+                                <span class="badge">{{ $album->visibility }}</span>
+                            @endunless
                         </li>
                     @endforeach
                 </ul>

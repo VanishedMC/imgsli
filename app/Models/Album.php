@@ -12,14 +12,26 @@ class Album extends Model
 {
     use HasFactory, HasUlids;
 
-    protected $fillable = ['user_id', 'title', 'is_public', 'images'];
+    /** Listed on the homepage and reachable by URL. */
+    public const VISIBILITY_PUBLIC = 'public';
+
+    /** Reachable by URL only; never listed. */
+    public const VISIBILITY_UNLISTED = 'unlisted';
+
+    /** Owner (or an admin) only. */
+    public const VISIBILITY_PRIVATE = 'private';
+
+    public const VISIBILITIES = [
+        self::VISIBILITY_PUBLIC,
+        self::VISIBILITY_UNLISTED,
+        self::VISIBILITY_PRIVATE,
+    ];
+
+    protected $fillable = ['user_id', 'title', 'visibility', 'images'];
 
     protected function casts(): array
     {
-        return [
-            'is_public' => 'boolean',
-            'images' => 'array',
-        ];
+        return ['images' => 'array'];
     }
 
     public function user(): BelongsTo
@@ -42,9 +54,11 @@ class Album extends Model
 
     public function isViewableBy(?User $user): bool
     {
-        // Admins manage all albums, so they can open any of them.
+        // Admins manage all albums, so they can open any of them. Public and
+        // unlisted albums are reachable by anyone with the URL; private ones
+        // only by their owner.
         return $user?->is_admin === true
-            || $this->is_public
+            || $this->visibility !== self::VISIBILITY_PRIVATE
             || ($user !== null && $this->user_id === $user->id);
     }
 }

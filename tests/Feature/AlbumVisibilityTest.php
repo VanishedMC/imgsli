@@ -12,7 +12,7 @@ class AlbumVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeAlbum(int $images, bool $public, ?User $user = null): Album
+    private function makeAlbum(int $images, string $visibility, ?User $user = null, string $title = 'Visibility Album'): Album
     {
         $keys = [];
         for ($i = 0; $i < $images; $i++) {
@@ -21,8 +21,8 @@ class AlbumVisibilityTest extends TestCase
 
         $album = Album::create([
             'user_id' => $user?->id ?? User::factory()->create()->id,
-            'title' => 'Visibility Album',
-            'is_public' => $public,
+            'title' => $title,
+            'visibility' => $visibility,
             'images' => array_map(fn ($k) => ['key' => $k, 'description' => ''], $keys),
         ]);
 
@@ -46,7 +46,7 @@ class AlbumVisibilityTest extends TestCase
 
     public function test_public_album_visible_to_anonymous(): void
     {
-        $album = $this->makeAlbum(2, public: true);
+        $album = $this->makeAlbum(2, Album::VISIBILITY_PUBLIC);
 
         $this->get(route('album', $album))
             ->assertOk()
@@ -54,10 +54,38 @@ class AlbumVisibilityTest extends TestCase
             ->assertSee('Visibility Album');
     }
 
+    public function test_unlisted_album_reachable_by_url_but_never_listed(): void
+    {
+        $album = $this->makeAlbum(2, Album::VISIBILITY_UNLISTED);
+
+        $this->get(route('album', $album))
+            ->assertOk()
+            ->assertSee('Visibility Album');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('album', $album))
+            ->assertOk();
+
+        $this->get('/')->assertOk()->assertDontSee('Visibility Album');
+    }
+
+    public function test_only_public_albums_are_listed_on_the_homepage(): void
+    {
+        $this->makeAlbum(2, Album::VISIBILITY_PUBLIC, title: 'Listed Album');
+        $this->makeAlbum(2, Album::VISIBILITY_UNLISTED, title: 'Hidden Unlisted Album');
+        $this->makeAlbum(2, Album::VISIBILITY_PRIVATE, title: 'Hidden Private Album');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Listed Album')
+            ->assertDontSee('Hidden Unlisted Album')
+            ->assertDontSee('Hidden Private Album');
+    }
+
     public function test_private_album_hidden_from_anonymous_and_others(): void
     {
         $owner = User::factory()->create();
-        $album = $this->makeAlbum(2, public: false, user: $owner);
+        $album = $this->makeAlbum(2, Album::VISIBILITY_PRIVATE, user: $owner);
 
         $this->get(route('album', $album))->assertNotFound();
 
@@ -78,7 +106,7 @@ class AlbumVisibilityTest extends TestCase
     public function test_album_page_shows_actions_to_owner_and_admins_only(): void
     {
         $owner = User::factory()->create();
-        $album = $this->makeAlbum(2, public: false, user: $owner);
+        $album = $this->makeAlbum(2, Album::VISIBILITY_PRIVATE, user: $owner);
 
         $this->actingAs($owner)
             ->get(route('album', $album))
@@ -96,7 +124,7 @@ class AlbumVisibilityTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get(route('album', $album))->assertNotFound();
 
-        $public = $this->makeAlbum(2, public: true);
+        $public = $this->makeAlbum(2, Album::VISIBILITY_PUBLIC);
         $this->get(route('album', $public))
             ->assertOk()
             ->assertDontSee('publicity-toggle', false);
@@ -104,7 +132,7 @@ class AlbumVisibilityTest extends TestCase
 
     public function test_initial_picker_positions_from_url(): void
     {
-        $album = $this->makeAlbum(4, public: true);
+        $album = $this->makeAlbum(4, Album::VISIBILITY_PUBLIC);
 
         $this->get(route('album', [$album, 1, 3]))
             ->assertOk()

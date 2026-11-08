@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
@@ -29,7 +30,7 @@ class AlbumController extends Controller
 
         return view('compare', [
             'mine' => $mine,
-            'public' => Album::where('is_public', true)->latest()->limit(12)->get(),
+            'public' => Album::where('visibility', Album::VISIBILITY_PUBLIC)->latest()->limit(12)->get(),
             // The client-side save checks mirror the server caps; admins get
             // the higher effective ones (see effectiveMaxImageBytes() /
             // effectiveMaxImages()).
@@ -113,7 +114,7 @@ class AlbumController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
-            'is_public' => ['sometimes', 'boolean'],
+            'visibility' => ['sometimes', Rule::in(Album::VISIBILITIES)],
             'images' => ['required', 'array', 'min:'.$minImages, 'max:'.$maxImages],
             'images.*' => ['array'],
             'images.*.file' => ['nullable', 'file', 'image:png,jpeg,gif,webp', 'max:'.$maxKb],
@@ -179,7 +180,7 @@ class AlbumController extends Controller
             $album = Album::create([
                 'user_id' => $request->user()->id,
                 'title' => $validated['title'] ?? null,
-                'is_public' => $validated['is_public'] ?? true,
+                'visibility' => $validated['visibility'] ?? Album::VISIBILITY_PUBLIC,
                 'images' => $images,
             ]);
         } catch (Throwable $e) {
@@ -192,8 +193,8 @@ class AlbumController extends Controller
     }
 
     /**
-     * Update: PATCH /api/albums/{album} with {is_public: bool} and/or
-     * {title} (rename; null clears the title).
+     * Update: PATCH /api/albums/{album} with {visibility: "public" |
+     * "unlisted" | "private"} and/or {title} (rename; null clears the title).
      */
     public function update(Request $request, Album $album): JsonResponse
     {
@@ -204,7 +205,7 @@ class AlbumController extends Controller
 
         $validated = $request->validate([
             'title' => ['sometimes', 'nullable', 'string', 'max:200'],
-            'is_public' => ['sometimes', 'boolean'],
+            'visibility' => ['sometimes', Rule::in(Album::VISIBILITIES)],
         ]);
 
         abort_if($validated === [], 422);
@@ -214,7 +215,7 @@ class AlbumController extends Controller
         return response()->json([
             'id' => $album->id,
             'title' => $album->title,
-            'is_public' => $album->is_public,
+            'visibility' => $album->visibility,
             'url' => route('album', $album),
         ]);
     }

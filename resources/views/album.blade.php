@@ -10,8 +10,11 @@
             <div class="album-head-actions">
                 <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998; Rename</button>
                 <label class="publicity">
-                    <input type="checkbox" class="publicity-toggle" data-id="{{ $album->id }}" @checked($album->is_public)>
-                    Public
+                    <select class="publicity-toggle" data-id="{{ $album->id }}" aria-label="Visibility">
+                        <option value="public" @selected($album->visibility === 'public')>Public</option>
+                        <option value="unlisted" @selected($album->visibility === 'unlisted')>Unlisted</option>
+                        <option value="private" @selected($album->visibility === 'private')>Private</option>
+                    </select>
                 </label>
                 <button type="button" class="btn danger" id="delete-album" data-id="{{ $album->id }}">Delete</button>
             </div>

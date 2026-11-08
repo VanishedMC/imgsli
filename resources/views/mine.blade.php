@@ -16,8 +16,11 @@
                            href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
                         <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998;</button>
                         <label class="publicity">
-                            <input type="checkbox" class="publicity-toggle" data-id="{{ $album->id }}" @checked($album->is_public)>
-                            Public
+                            <select class="publicity-toggle" data-id="{{ $album->id }}" aria-label="Visibility">
+                                <option value="public" @selected($album->visibility === 'public')>Public</option>
+                                <option value="unlisted" @selected($album->visibility === 'unlisted')>Unlisted</option>
+                                <option value="private" @selected($album->visibility === 'private')>Private</option>
+                            </select>
                         </label>
                         <time datetime="{{ $album->created_at->toIso8601String() }}">{{ $album->created_at->format('Y-m-d') }}</time>
                         <form method="POST" action="{{ route('albums.destroy', $album) }}" class="inline"

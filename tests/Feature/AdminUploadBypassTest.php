@@ -81,7 +81,7 @@ class AdminUploadBypassTest extends TestCase
     private function postAs(User $user, array $images)
     {
         return $this->actingAs($user)
-            ->postJson('/api/albums', ['title' => 'T', 'is_public' => true, 'images' => $images], [
+            ->postJson('/api/albums', ['title' => 'T', 'visibility' => 'public', 'images' => $images], [
                 'Accept' => 'application/json',
             ]);
     }

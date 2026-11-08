@@ -23,7 +23,7 @@ class AdminDashboardTest extends TestCase
         return Album::create([
             'user_id' => $owner->id,
             'title' => 'A'.count($keys),
-            'is_public' => $public,
+            'visibility' => $public ? 'public' : 'private',
             'images' => array_map(fn ($k) => ['key' => $k, 'description' => ''], $keys),
         ]);
     }

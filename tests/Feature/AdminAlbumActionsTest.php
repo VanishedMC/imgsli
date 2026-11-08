@@ -34,7 +34,7 @@ class AdminAlbumActionsTest extends TestCase
         $album = Album::create([
             'user_id' => $this->owner->id,
             'title' => 'Owned',
-            'is_public' => $public,
+            'visibility' => $public ? 'public' : 'private',
             'images' => [],
         ]);
 
@@ -72,11 +72,11 @@ class AdminAlbumActionsTest extends TestCase
         $album = $this->makeAlbum(true);
 
         $this->actingAs($this->admin)
-            ->patchJson(route('albums.update', $album), ['is_public' => false])
+            ->patchJson(route('albums.update', $album), ['visibility' => 'private'])
             ->assertStatus(200)
-            ->assertJsonPath('is_public', false);
+            ->assertJsonPath('visibility', 'private');
 
-        $this->assertDatabaseHas('albums', ['id' => $album->id, 'is_public' => false]);
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'visibility' => 'private']);
 
         // Regular users lose access to the now-private album...
         $this->actingAs(User::factory()->create())

@@ -36,7 +36,7 @@
   const progressRow = progress?.closest('.progress-row');
   const errorsList = document.getElementById('save-errors');
   const titleInput = document.getElementById('album-title');
-  const publicCheck = document.getElementById('album-public');
+  const visibilitySelect = document.getElementById('album-visibility');
   const csrf = document.querySelector('meta[name=csrf-token]')?.content ?? '';
 
   let saving = false;
@@ -574,7 +574,7 @@
 
     const data = new FormData();
     data.append('title', titleInput?.value.trim() ?? '');
-    data.append('is_public', publicCheck?.checked ? '1' : '0');
+    data.append('visibility', visibilitySelect?.value || 'public');
     let n = 0;
     for (const s of sources) {
       if (s.file) {

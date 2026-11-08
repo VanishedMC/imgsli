@@ -37,7 +37,7 @@ class UploadLimitsConfigTest extends TestCase
         $images = array_map(fn (UploadedFile $f) => ['file' => $f], $files);
 
         return $this->actingAs($this->user)
-            ->postJson('/api/albums', ['title' => 'T', 'is_public' => true, 'images' => $images], [
+            ->postJson('/api/albums', ['title' => 'T', 'visibility' => 'public', 'images' => $images], [
                 'Accept' => 'application/json',
             ]);
     }

@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
         $album = Album::create([
             'user_id' => $user->id,
             'title' => $title,
-            'is_public' => true,
+            'visibility' => Album::VISIBILITY_PUBLIC,
             'images' => [],
         ]);
 

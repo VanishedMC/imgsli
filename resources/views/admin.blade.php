@@ -69,8 +69,10 @@
                             </td>
                             <td>{{ $album->user->username ?? '—' }}</td>
                             <td>
-                                @if($album->is_public)
+                                @if($album->visibility === 'public')
                                     <span class="badge">public</span>
+                                @elseif($album->visibility === 'unlisted')
+                                    <span class="badge admin-unlisted">unlisted</span>
                                 @else
                                     <span class="badge admin-private">private</span>
                                 @endif

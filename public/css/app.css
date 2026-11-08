@@ -335,7 +335,21 @@ progress {
     font-size: 12px;
     cursor: pointer;
 }
-.publicity input { margin: 0; }
+.publicity select, .save-panel select {
+    font: inherit;
+    margin: 0;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #1b2024;
+    color: var(--text);
+    font-size: 12px;
+}
+.publicity select:focus, .save-panel select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.save-panel select { font-size: 14px; padding: 6px 9px; }
 
 .badge {
     font-size: 11px;
@@ -400,3 +414,4 @@ progress {
 .admin-avatar { vertical-align: middle; margin-right: 6px; border-radius: 50%; }
 .admin-badge { background: var(--accent); color: #fff; border-color: transparent; }
 .admin-private { background: #b45309; color: #fff; border-color: transparent; }
+.admin-unlisted { background: #0e7490; color: #fff; border-color: transparent; }

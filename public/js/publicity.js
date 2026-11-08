@@ -1,33 +1,38 @@
-// imgsli — album visibility toggle, shared by /mine and /a/{album}.
-// Each .publicity-toggle checkbox posts PATCH /api/albums/{id} with
-// {is_public}; the new state is kept on success, reverted on failure.
+// imgsli — album visibility picker, shared by /mine and /a/{album}.
+// Each .publicity-toggle <select> posts PATCH /api/albums/{id} with
+// {visibility}; the new state is kept on success, reverted on failure.
 // Loaded (at the end of the body) before the page script.
 (() => {
   const csrf = document.querySelector('meta[name=csrf-token]')?.content ?? '';
 
-  document.querySelectorAll('.publicity-toggle').forEach((input) => {
-    input.addEventListener('change', async () => {
-      const wanted = input.checked;
-      input.disabled = true;
+  document.querySelectorAll('.publicity-toggle').forEach((select) => {
+    let previous = select.value;
 
-      const res = await fetch(`/api/albums/${input.dataset.id}`, {
-        method: 'PATCH',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': csrf,
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ is_public: wanted }),
-      });
+    select.addEventListener('change', async () => {
+      const wanted = select.value;
+      select.disabled = true;
 
-      if (res.ok) {
-        input.disabled = false;
-        return;
+      let ok = false;
+      try {
+        const res = await fetch(`/api/albums/${select.dataset.id}`, {
+          method: 'PATCH',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrf,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ visibility: wanted }),
+        });
+        ok = res.ok;
+        if (!ok) alert('Visibility change failed (HTTP ' + res.status + ')');
+      } catch {
+        alert('Visibility change failed (network error)');
       }
-      input.checked = !wanted; // revert
-      input.disabled = false;
-      alert('Visibility change failed (HTTP ' + res.status + ')');
+
+      if (ok) previous = wanted;
+      else select.value = previous; // revert
+      select.disabled = false;
     });
   });
 })();

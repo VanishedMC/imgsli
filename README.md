@@ -21,10 +21,11 @@ Log in with Discord to save your comparisons as albums and share them by link.
   anonymous comparisons are never uploaded anywhere.
 - **Save as an album.** Log in with Discord, give it a title, and save. File
   images are uploaded and URL images are fetched to the server.
-- **Share albums.** Every saved album gets a link. Mark it **public** to share
-  it with anyone, or keep it **private** so only you can open it. Deep-link to
-  a specific slider position with `/a/{album}/{before}/{after}`.
-- **Manage your albums.** Rename, toggle public/private, and delete
+- **Share albums.** Every saved album gets a link. Mark it **public** to list
+  it on the home page, **unlisted** to keep it reachable by URL only, or
+  **private** so only you can open it. Deep-link to a specific slider position
+  with `/a/{album}/{before}/{after}`.
+- **Manage your albums.** Rename, switch between public/unlisted/private, and delete
   (Images can't be edited after saving — to change them, delete and re-upload.)
 
 ### The compare tool, at a glance
@@ -35,6 +36,7 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | Sources | local files (picked or dragged in) **or** image URLs |
 | Formats | PNG, JPEG, GIF, WebP |
 | Size | up to 10 MB per image (50 MB for admin users) |
+| Visibility | **public** (listed on the home page), **unlisted** (URL only), **private** (owner/admin only) |
 | Slider | live in the browser; drag the handle to compare; drag boxes to reorder |
 | Privacy | anonymous = 100% client-side, nothing leaves your browser |
 
@@ -45,8 +47,8 @@ Log in with Discord to save your comparisons as albums and share them by link.
    URL. Add two or more.
 3. Drag boxes to reorder them; add a caption to any box.
 4. Drag the slider handle to compare *before* and *after*.
-5. To save: click **Log in with Discord**, add a title, choose **public** or
-   **private**, then **Save album**. You'll get a link to copy and share.
+5. To save: click **Log in with Discord**, add a title, choose **public**,
+   **unlisted** or **private**, then **Save album**. You'll get a link to share.
 6. Manage what you've saved under **My albums**.
 
 ## Under the hood
@@ -65,11 +67,11 @@ Log in with Discord to save your comparisons as albums and share them by link.
 
 | Method & path | Auth | What |
 |---|---|---|
-| `GET /` | any | The compare tool. Logged in: title field, public/private toggle, save button. A "public albums" strip lists recent public albums. |
-| `GET /a/{album}` | public: any; private: owner **or admin** | Album view — the component with the stored images. The owner — and any admin — gets a rename, a public/private toggle and delete. `/{before}/{after}` set the initial picker positions. |
-| `GET /mine` | Discord | Your albums (public + private) with a rename, a public/private toggle and delete. |
-| `POST /api/albums` | Discord | Multipart: `title`, `is_public`, and per image `images[n].file` **or** `images[n].url` (2–8 images, 16 for admin users; png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
-| `PATCH /api/albums/{album}` | owner **or admin** | JSON `{is_public: bool}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
+| `GET /` | any | The compare tool. Logged in: title field, visibility picker, save button. A "public albums" strip lists recent public albums only. |
+| `GET /a/{album}` | public/unlisted: any; private: owner **or admin** | Album view — the component with the stored images. The owner — and any admin — gets a rename, a visibility picker and delete. `/{before}/{after}` set the initial picker positions. |
+| `GET /mine` | Discord | Your albums (all visibilities) with a rename, a visibility picker and delete. |
+| `POST /api/albums` | Discord | Multipart: `title`, `visibility` (`public` default, `unlisted`, `private`), and per image `images[n].file` **or** `images[n].url` (2–8 images, 16 for admin users; png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
+| `PATCH /api/albums/{album}` | owner **or admin** | JSON `{visibility: "public" | "unlisted" | "private"}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
 | `DELETE /api/albums/{album}` | owner **or admin** | Deletes the album and its stored files. Images are immutable (rename/visibility are editable). |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
 | `POST /logout` | — | |
@@ -298,8 +300,8 @@ All upload limits are centralized in `config/uploads.php` and driven by the
 
 ## Tests
 
-`tests/Feature` (PHPUnit) cover page rendering (compare, album public/private
-access), album creation (file, URL, mixed), validation failures, URL-SSRF
+`tests/Feature` (PHPUnit) cover page rendering (compare; public, unlisted and
+private album access), album creation (file, URL, mixed), validation failures, URL-SSRF
 rejection, rename, delete, and the Discord callback upsert. Run with `php artisan test`
 against a separate `imgsli_test` database (see `phpunit.xml`) — or in the
 Docker dev setup, `docker compose run --rm test`
@@ -312,7 +314,7 @@ app/ bootstrap/ config/ database/ public/ resources/ routes/ storage/
 public/image-compare.js          # the component (custom element <image-compare>)
 public/js/compare.js             # client app: image boxes, live render, save flow
 public/js/album.js               # album page wiring
-public/js/publicity.js           # shared public/private toggle (mine + album)
+public/js/publicity.js           # shared visibility picker (mine + album)
 public/js/rename.js              # shared inline rename (mine + album)
 docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sql
 docker-compose.yml docker-compose.dev.yml    # base (prod) + dev config

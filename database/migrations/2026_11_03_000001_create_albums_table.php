@@ -12,7 +12,9 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title', 200)->nullable();
-            $table->boolean('is_public')->default(true);
+            // public = listed on the homepage; unlisted = reachable by URL
+            // only; private = owner/admin only. See App\Models\Album.
+            $table->string('visibility', 20)->default('public');
             $table->json('images');
             $table->timestamps();
         });

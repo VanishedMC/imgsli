@@ -39,7 +39,7 @@ class AlbumApiTest extends TestCase
         return $this->actingAs($this->user)
             ->postJson('/api/albums', array_merge([
                 'title' => 'Test Album',
-                'is_public' => true,
+                'visibility' => 'public',
             ], $extra, ['images' => $images]), [
                 'Accept' => 'application/json',
             ]);
@@ -84,6 +84,27 @@ class AlbumApiTest extends TestCase
         foreach ($album->images as $image) {
             Storage::disk('public')->assertExists($image['key']);
         }
+    }
+
+    public function test_visibility_is_stored_on_create(): void
+    {
+        $images = [
+            ['file' => UploadedFile::fake()->image('a.png')],
+            ['file' => UploadedFile::fake()->image('b.png')],
+        ];
+
+        // Explicit choice is honoured...
+        $response = $this->postAlbums($images, ['visibility' => 'unlisted']);
+        $response->assertStatus(201);
+        $this->assertSame('unlisted', Album::findOrFail($response->json('id'))->visibility);
+
+        // ...and the default (no field) is public.
+        $response = $this->postAlbums($images);
+        $response->assertStatus(201);
+        $this->assertSame('public', Album::findOrFail($response->json('id'))->visibility);
+
+        // Anything else is rejected.
+        $this->postAlbums($images, ['visibility' => 'secret'])->assertStatus(422);
     }
 
     public function test_single_image_rejected(): void
@@ -241,13 +262,13 @@ class AlbumApiTest extends TestCase
         $mine = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Mine',
-            'is_public' => true,
+            'visibility' => 'public',
             'images' => [['key' => 'x', 'description' => '']],
         ]);
         $other = Album::create([
             'user_id' => User::factory()->create()->id,
             'title' => 'Other',
-            'is_public' => true,
+            'visibility' => 'public',
             'images' => [['key' => 'y', 'description' => '']],
         ]);
 
@@ -265,7 +286,7 @@ class AlbumApiTest extends TestCase
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'ToDelete',
-            'is_public' => true,
+            'visibility' => 'public',
             'images' => [],
         ]);
         foreach (['a.png', 'b.png'] as $i => $name) {
@@ -289,7 +310,7 @@ class AlbumApiTest extends TestCase
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Mine',
-            'is_public' => true,
+            'visibility' => 'public',
             'images' => [],
         ]);
 
@@ -305,7 +326,7 @@ class AlbumApiTest extends TestCase
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Toggle',
-            'is_public' => false,
+            'visibility' => 'private',
             'images' => [],
         ]);
         $stranger = User::factory()->create();
@@ -315,20 +336,28 @@ class AlbumApiTest extends TestCase
 
         // private -> public: non-owner can view
         $this->actingAs($this->user)
-            ->patchJson(route('albums.update', $album), ['is_public' => true])
+            ->patchJson(route('albums.update', $album), ['visibility' => 'public'])
             ->assertStatus(200)
-            ->assertJsonPath('is_public', true);
+            ->assertJsonPath('visibility', 'public');
 
         $this->actingAs($stranger)->get(route('album', $album))->assertStatus(200);
 
-        // public -> private: non-owner loses access
+        // public -> unlisted: still reachable by URL, just not listed
         $this->actingAs($this->user)
-            ->patchJson(route('albums.update', $album), ['is_public' => false])
+            ->patchJson(route('albums.update', $album), ['visibility' => 'unlisted'])
             ->assertStatus(200)
-            ->assertJsonPath('is_public', false);
+            ->assertJsonPath('visibility', 'unlisted');
+
+        $this->actingAs($stranger)->get(route('album', $album))->assertStatus(200);
+
+        // unlisted -> private: non-owner loses access
+        $this->actingAs($this->user)
+            ->patchJson(route('albums.update', $album), ['visibility' => 'private'])
+            ->assertStatus(200)
+            ->assertJsonPath('visibility', 'private');
 
         $this->actingAs($stranger)->get(route('album', $album))->assertStatus(404);
-        $this->assertDatabaseHas('albums', ['id' => $album->id, 'is_public' => false]);
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'visibility' => 'private']);
     }
 
     public function test_owner_renames_album(): void
@@ -336,7 +365,7 @@ class AlbumApiTest extends TestCase
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Before',
-            'is_public' => false,
+            'visibility' => 'private',
             'images' => [],
         ]);
         $stranger = User::factory()->create();
@@ -351,10 +380,10 @@ class AlbumApiTest extends TestCase
 
         // rename + visibility in one patch
         $this->actingAs($this->user)
-            ->patchJson(route('albums.update', $album), ['title' => 'Both', 'is_public' => true])
+            ->patchJson(route('albums.update', $album), ['title' => 'Both', 'visibility' => 'public'])
             ->assertStatus(200)
             ->assertJsonPath('title', 'Both')
-            ->assertJsonPath('is_public', true);
+            ->assertJsonPath('visibility', 'public');
 
         // clearing the title
         $this->actingAs($this->user)
@@ -377,23 +406,23 @@ class AlbumApiTest extends TestCase
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Toggle',
-            'is_public' => true,
+            'visibility' => 'public',
             'images' => [],
         ]);
 
         $this->actingAs(User::factory()->create())
-            ->patchJson(route('albums.update', $album), ['is_public' => false])
+            ->patchJson(route('albums.update', $album), ['visibility' => 'private'])
             ->assertStatus(404);
 
-        $this->assertDatabaseHas('albums', ['id' => $album->id, 'is_public' => true]);
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'visibility' => 'public']);
     }
 
-    public function test_update_requires_boolean(): void
+    public function test_update_requires_valid_visibility(): void
     {
         $album = Album::create([
             'user_id' => $this->user->id,
             'title' => 'Toggle',
-            'is_public' => false,
+            'visibility' => 'private',
             'images' => [],
         ]);
 
@@ -402,9 +431,9 @@ class AlbumApiTest extends TestCase
             ->assertStatus(422);
 
         $this->actingAs($this->user)
-            ->patchJson(route('albums.update', $album), ['is_public' => 'not-a-bool'])
+            ->patchJson(route('albums.update', $album), ['visibility' => 'secret'])
             ->assertStatus(422);
 
-        $this->assertDatabaseHas('albums', ['id' => $album->id, 'is_public' => false]);
+        $this->assertDatabaseHas('albums', ['id' => $album->id, 'visibility' => 'private']);
     }
 }
