@@ -43,7 +43,7 @@
  *
  * Properties: images (parsed list, read-only), beforeIndex, afterIndex, mode,
  *   layout, position, amplify. Methods: enterFullscreen(), exitFullscreen(),
- *   copyLink(), downloadView(), downloadImage('before' | 'after').
+ *   swapImages(), copyLink(), downloadView(), downloadImage('before' | 'after').
  * Event: "image-compare-change" (bubbles) with detail {beforeIndex, afterIndex,
  *   mode, layout, position, zoom, x, y} after user changes.
  * Styling: --image-compare-max-height (default calc(100vh - 100px)),
@@ -387,6 +387,7 @@ function template() {
 <div class="toolbar" part="toolbar" role="toolbar" aria-label="Comparison tools" title="">
   <div class="group modes">${MODES.map((m) => `<button type="button" class="btn" data-mode="${m.id}">${m.label}</button>`).join('')}</div>
   <button type="button" class="btn layout-btn" title="Switch between left/right and top/bottom">${svg(TOOL_ICONS.layout)}<span>Divider</span></button>
+  <button type="button" class="btn swap-btn" title="Swap the left and right images">${svg(TOOL_ICONS.swap)}<span>Swap</span></button>
   <div class="group blink-group">
     <button type="button" class="btn blink-btn" title="Show the other image (click or Space)">${svg(TOOL_ICONS.swap)}<span>Switch</span></button>
     <select class="select blink-select" title="Switch automatically">${BLINK_INTERVALS.map((o) => `<option value="${o.ms}">${o.label}</option>`).join('')}</select>
@@ -483,6 +484,7 @@ class ImageCompare extends HTMLElement {
       lens: $('.lens'),
       modeButtons: [...root.querySelectorAll('[data-mode]')],
       layoutBtn: $('.layout-btn'),
+      swapBtn: $('.swap-btn'),
       blinkGroup: $('.blink-group'),
       blinkSelect: $('.blink-select'),
       diffGroup: $('.diff-group'),
@@ -777,6 +779,14 @@ class ImageCompare extends HTMLElement {
     this.#updateUrl();
   }
 
+  /** Swap the left and right images. */
+  swapImages() {
+    this.#userChange(() => {
+      const { a, b } = { a: this.beforeIndex, b: this.afterIndex };
+      this.#sel = { a: b, b: a };
+    });
+  }
+
   // ---------- difference and magnifier ----------
 
   #scheduleDiff() {
@@ -1034,6 +1044,7 @@ class ImageCompare extends HTMLElement {
 
     for (const btn of $.modeButtons) btn.addEventListener('click', () => this.#userChange(() => { this.mode = btn.dataset.mode; }));
     $.layoutBtn.addEventListener('click', () => this.#userChange(() => { this.layout = this.layout === 'top-bottom' ? 'left-right' : 'top-bottom'; }));
+    $.swapBtn.addEventListener('click', () => this.swapImages());
     this.shadowRoot.querySelector('.blink-btn').addEventListener('click', () => this.#toggleBlink());
     $.blinkSelect.addEventListener('change', () => this.#applyBlinkTimer());
     $.amp.addEventListener('input', () => this.#userChange(() => { this.amplify = Number($.amp.value); }));
