@@ -148,6 +148,44 @@ class AlbumImageEditTest extends TestCase
         Storage::disk('public')->assertExists($images[2]['key']);
     }
 
+    public function test_malformed_redirect_preserves_album_and_removes_new_files(): void
+    {
+        Http::fake([
+            'example.com/image' => Http::response('', 302, ['Location' => '//[invalid']),
+        ]);
+
+        $album = $this->makeAlbum();
+        $original = $album->images;
+        [$first, $second] = $this->keys($album);
+
+        $this->putImages($album, [
+            ['key' => $first],
+            ['file' => UploadedFile::fake()->image('new.png')],
+            ['url' => 'https://example.com/image'],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['images']);
+
+        $this->assertSame($original, $album->fresh()->images);
+        $this->assertEqualsCanonicalizing([$first, $second], Storage::disk('public')->allFiles());
+    }
+
+    public function test_images_must_be_a_list(): void
+    {
+        $album = $this->makeAlbum();
+        $original = $album->images;
+        [$first, $second] = $this->keys($album);
+
+        foreach ([
+            ['before' => ['key' => $first], 'after' => ['file' => UploadedFile::fake()->image('b.png')]],
+            [0 => ['key' => $first], 2 => ['key' => $second]],
+        ] as $images) {
+            $this->putImages($album, $images)->assertUnprocessable()->assertJsonValidationErrors(['images']);
+        }
+
+        $this->assertSame($original, $album->fresh()->images);
+        Storage::disk('public')->assertExists($first);
+        Storage::disk('public')->assertExists($second);
+    }
+
     public function test_count_limits_are_enforced(): void
     {
         config(['uploads.max_images' => 3]);
@@ -277,5 +315,42 @@ class AlbumImageEditTest extends TestCase
             ->assertOk()
             ->assertDontSee('id="edit-images"', false)
             ->assertDontSee('id="album-edit"', false);
+    }
+
+    public function test_caption_can_be_cleared(): void
+    {
+        $album = $this->makeAlbum(['Before', 'After']);
+        [$a, $b] = $this->keys($album);
+
+        // An empty description is sent (not omitted) and must overwrite the
+        // stored caption; omitting the field means "keep it".
+        $this->putImages($album, [
+            ['key' => $a, 'description' => ''],
+            ['key' => $b, 'description' => 'After'],
+        ])->assertOk();
+
+        $fresh = $album->fresh();
+        $this->assertSame('', $fresh->images[0]['description']);
+        $this->assertSame('After', $fresh->images[1]['description']);
+    }
+
+    public function test_editor_request_with_method_spoofing_saves(): void
+    {
+        // What the browser actually sends: POST + _method=PUT, because PHP
+        // does not parse multipart bodies for a real PUT.
+        $album = $this->makeAlbum(['Before', 'After']);
+        [$a, $b] = $this->keys($album);
+
+        $this->actingAs($this->owner)
+            ->post("/api/albums/{$album->id}/images", [
+                '_method' => 'PUT',
+                'images' => [
+                    ['key' => $a, 'description' => 'New caption'],
+                    ['key' => $b, 'description' => 'After'],
+                ],
+            ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $this->assertSame('New caption', $album->fresh()->images[0]['description']);
     }
 }

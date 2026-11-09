@@ -1,5 +1,12 @@
 <?php
 
+// Album images (the `public` disk) are either on the server's own disk or in
+// an S3 bucket. The two drivers need different keys: S3 takes a bucket plus an
+// optional key prefix, the local driver takes a path. STORAGE_DISK_ROOT means
+// "where the files live" in both cases — the bucket name for S3, the path for
+// local — and STORAGE_DISK_PREFIX is the S3-only key prefix.
+$albumDiskIsS3 = env('STORAGE_DISK', 'local') === 's3';
+
 return [
 
     /*
@@ -38,18 +45,31 @@ return [
             'report' => false,
         ],
 
-        'public' => [
-            // STORAGE_DISK: local (default, storage/app/public + storage:link)
-            // or s3 (STORAGE_DISK_ROOT = bucket, AWS_* credentials,
-            // STORAGE_DISK_URL = public base URL).
-            'driver' => env('STORAGE_DISK', 'local'),
-            'root' => env('STORAGE_DISK_ROOT', storage_path('app/public')),
-            'url' => env('STORAGE_DISK_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/storage'),
+        // Album images. `throw` is on: a failed write must fail the request
+        // instead of leaving an album row that points at missing files.
+        'public' => $albumDiskIsS3 ? [
+            // STORAGE_DISK=s3: bucket in STORAGE_DISK_ROOT (or AWS_BUCKET),
+            // optional key prefix in STORAGE_DISK_PREFIX, public base URL in
+            // STORAGE_DISK_URL.
+            'driver' => 's3',
+            'bucket' => env('STORAGE_DISK_ROOT') ?: env('AWS_BUCKET'),
+            'root' => (string) env('STORAGE_DISK_PREFIX', ''),
+            'url' => env('STORAGE_DISK_URL'),
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'visibility' => 'public',
-            'throw' => false,
+            'throw' => true,
+            'report' => false,
+        ] : [
+            // STORAGE_DISK=local (default): storage/app/public + storage:link.
+            'driver' => 'local',
+            'root' => env('STORAGE_DISK_ROOT', storage_path('app/public')),
+            'url' => env('STORAGE_DISK_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/storage'),
+            'visibility' => 'public',
+            'throw' => true,
             'report' => false,
         ],
 

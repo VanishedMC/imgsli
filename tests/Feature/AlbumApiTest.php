@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Album;
 use App\Models\User;
 use App\Services\RemoteImageFetcher;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -112,6 +113,18 @@ class AlbumApiTest extends TestCase
         $this->postAlbums([
             ['file' => UploadedFile::fake()->image('a.png')],
         ])->assertStatus(422);
+
+        $this->assertDatabaseCount('albums', 0);
+    }
+
+    public function test_images_must_be_a_list(): void
+    {
+        foreach ([
+            ['before' => ['file' => UploadedFile::fake()->image('a.png')], 'after' => ['file' => UploadedFile::fake()->image('b.png')]],
+            [0 => ['file' => UploadedFile::fake()->image('a.png')], 2 => ['file' => UploadedFile::fake()->image('b.png')]],
+        ] as $images) {
+            $this->postAlbums($images)->assertUnprocessable()->assertJsonValidationErrors(['images']);
+        }
 
         $this->assertDatabaseCount('albums', 0);
     }
@@ -280,6 +293,50 @@ class AlbumApiTest extends TestCase
         $response->assertSee('publicity-toggle', false);
     }
 
+    public function test_mine_is_paginated(): void
+    {
+        $perPage = $this->actingAs($this->user)->get('/mine')->viewData('albums')->perPage();
+        for ($i = 1; $i <= $perPage + 1; $i++) {
+            Album::forceCreate([
+                'user_id' => $this->user->id,
+                'title' => "Album {$i}",
+                'visibility' => 'private',
+                'images' => [['key' => "k{$i}", 'description' => '']],
+                'created_at' => now()->subMinutes($perPage + 1 - $i),
+            ]);
+        }
+
+        $first = $this->actingAs($this->user)->get('/mine');
+        $first->assertOk()
+            ->assertSee('class="pagination"', false)
+            ->assertSee('page=2', false)
+            ->assertSee('Album '.($perPage + 1).'<', false)
+            ->assertDontSee('>Album 1<', false);
+
+        $this->actingAs($this->user)->get('/mine?page=2')
+            ->assertOk()
+            ->assertSee('>Album 1<', false)
+            ->assertSee('aria-current="page"', false);
+
+        $this->actingAs($this->user)->get('/mine?page=9')
+            ->assertRedirect('/mine?page=2');
+    }
+
+    public function test_mine_has_no_pagination_for_a_single_page(): void
+    {
+        Album::create([
+            'user_id' => $this->user->id,
+            'title' => 'Only',
+            'visibility' => 'public',
+            'images' => [['key' => 'x', 'description' => '']],
+        ]);
+
+        $this->actingAs($this->user)->get('/mine')
+            ->assertOk()
+            ->assertSee('Only')
+            ->assertDontSee('class="pagination"', false);
+    }
+
     public function test_owner_deletes_album_and_files(): void
     {
         $keys = [];
@@ -435,5 +492,95 @@ class AlbumApiTest extends TestCase
             ->assertStatus(422);
 
         $this->assertDatabaseHas('albums', ['id' => $album->id, 'visibility' => 'private']);
+    }
+
+    /** A real PNG of the given size (GD), for checks that read the header. */
+    private function pngBytes(int $width = 8, int $height = 8): string
+    {
+        $img = imagecreatetruecolor($width, $height);
+        imagefill($img, 0, 0, imagecolorallocate($img, 20, 80, 160));
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+
+        return $png;
+    }
+
+    public function test_oversized_dimensions_are_rejected(): void
+    {
+        // 1 px tall, but wider than the cap: a small file that would still
+        // decode to a huge bitmap in a viewer.
+        $maxSide = (int) config('uploads.max_image_side');
+
+        $this->postAlbums([
+            ['file' => UploadedFile::fake()->image('normal.png')],
+            ['file' => UploadedFile::fake()->image('wide.png', $maxSide + 1, 1)],
+        ])->assertStatus(422);
+
+        $this->assertDatabaseCount('albums', 0);
+    }
+
+    public function test_url_image_with_oversized_dimensions_is_rejected(): void
+    {
+        $maxSide = (int) config('uploads.max_image_side');
+        Http::fake([
+            'example.com/wide.png' => Http::response($this->pngBytes($maxSide + 1, 1), 200, ['Content-Type' => 'image/png']),
+        ]);
+
+        $this->postAlbums([
+            ['file' => UploadedFile::fake()->image('a.png')],
+            ['url' => 'https://example.com/wide.png'],
+        ])->assertStatus(422);
+
+        $this->assertDatabaseCount('albums', 0);
+    }
+
+    public function test_failed_disk_write_fails_the_request_and_leaves_no_album(): void
+    {
+        // The disk raises (throw=true): the request must fail instead of
+        // committing an album that points at files nothing wrote.
+        $disk = \Mockery::mock(Filesystem::class);
+        $disk->shouldReceive('putFileAs')->andThrow(new \RuntimeException('disk full'));
+        $disk->shouldReceive('delete')->andReturnTrue();
+        Storage::set('public', $disk);
+
+        $this->postAlbums([
+            ['file' => UploadedFile::fake()->image('a.png')],
+            ['file' => UploadedFile::fake()->image('b.png')],
+        ])->assertStatus(500);
+
+        $this->assertDatabaseCount('albums', 0);
+    }
+
+    public function test_malformed_redirect_is_rejected_without_leaving_files(): void
+    {
+        Http::fake([
+            'example.com/image' => Http::response('', 302, ['Location' => '//[invalid']),
+        ]);
+
+        $this->postAlbums([
+            ['file' => UploadedFile::fake()->image('a.png')],
+            ['url' => 'https://example.com/image'],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['images']);
+
+        $this->assertDatabaseCount('albums', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    public function test_relative_redirect_resolves_against_the_requested_url(): void
+    {
+        // Location: img.png from /a/b.png must become /a/img.png, not /img.png.
+        Http::fake([
+            'example.com/a/b.png' => Http::response('', 302, ['Location' => 'img.png']),
+            'example.com/a/img.png' => Http::response($this->pngBytes(), 200, ['Content-Type' => 'image/png']),
+        ]);
+
+        $this->postAlbums([
+            ['file' => UploadedFile::fake()->image('a.png')],
+            ['url' => 'https://example.com/a/b.png'],
+        ])->assertStatus(201);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://example.com/a/img.png');
     }
 }

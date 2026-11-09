@@ -561,14 +561,21 @@
   }
 
   function saveAlbum() {
+    // The prefilled demo images are a placeholder, not the user's album: they
+    // are relative paths the server would (correctly) refuse to fetch. A box
+    // still showing one is not submitted.
+    const isDemoSource = (box) => !fileInput(box).files.length && DEFAULT_IMAGES.includes(urlInput(box).value);
+
     const sources = allBoxes()
-      .map(boxState)
-      .filter((s) => s.file || s.url);
+      .map((box) => (isDemoSource(box) ? null : boxState(box)))
+      .filter((s) => s && (s.file || s.url));
 
     const errors = clientErrors(sources);
     showErrors(errors);
     if (sources.length < MIN) {
-      for (const box of allBoxes()) box.classList.toggle('invalid', !hasSource(box));
+      for (const box of allBoxes()) {
+        box.classList.toggle('invalid', !hasSource(box) || isDemoSource(box));
+      }
     }
     if (errors.length) return;
 

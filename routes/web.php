@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\Auth\DiscordController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +20,9 @@ Route::get('/admin', [AdminController::class, 'index'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/mine', [AlbumController::class, 'mine'])->name('albums.mine');
+    Route::get('/mine/download', [AlbumController::class, 'download'])
+        ->middleware('throttle:5,1')
+        ->name('albums.download');
     Route::post('/api/albums', [AlbumController::class, 'store'])
         ->middleware('throttle:'.config('uploads.store_rate'))
         ->name('albums.store');

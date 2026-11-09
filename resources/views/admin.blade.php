@@ -42,6 +42,7 @@
                     @endforeach
                 </tbody>
             </table>
+            {{ $users->links('pagination.default', ['label' => 'Users']) }}
         @endif
     </div>
 
@@ -83,6 +84,7 @@
                     @endforeach
                 </tbody>
             </table>
+            {{ $albums->links('pagination.default', ['label' => 'Albums']) }}
         @endif
     </div>
 </div>

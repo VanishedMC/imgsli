@@ -73,7 +73,7 @@
                     </select>
                 </label>
                 <button type="button" class="btn primary" id="save-btn">Save album</button>
-                <div class="progress-row">
+                <div class="progress-row" hidden>
                     <progress id="progress" max="1" value="0"></progress>
                     <span id="progress-text"></span>
                 </div>

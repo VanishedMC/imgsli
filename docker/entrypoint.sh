@@ -39,6 +39,7 @@ sed -i "s/__MAX_BODY__/${POST_MIB}m/" "$NGINX_CONF"
 cat > "$PHP_INI" <<EOF
 upload_max_filesize = ${FILE_MIB}M
 post_max_size = ${POST_MIB}M
+memory_limit = 256M
 EOF
 
 # Fail fast if the nginx template placeholder survived (drift / missing file).
@@ -54,5 +55,8 @@ chown -R www-data:www-data /var/www/html/storage/app
 
 php artisan migrate --force
 php artisan storage:link || true
+
+# Startup Artisan commands run as root and may create logs or cache files.
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 exec "$@"

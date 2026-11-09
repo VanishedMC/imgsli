@@ -43,6 +43,12 @@ return [
     // URL source: max length of the pasted URL string.
     'max_url_length' => (int) (env('UPLOAD_MAX_URL_LENGTH') ?: 2048),
 
+    // Pixel cap per side for a stored image (server-side; independent of the
+    // byte cap). A small file can declare an enormous bitmap and exhaust the
+    // memory of every viewer's browser, so both dimensions are checked after
+    // the bytes are in hand. 16384 px = 268 MP.
+    'max_image_side' => (int) (env('UPLOAD_MAX_IMAGE_SIDE') ?: 16384),
+
     // Server-side URL fetching.
     'max_redirects' => (int) (env('UPLOAD_MAX_REDIRECTS') ?: 3),  // max hops followed
     'hop_timeout' => (int) (env('UPLOAD_HOP_TIMEOUT') ?: 30),     // seconds, per connection

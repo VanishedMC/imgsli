@@ -305,6 +305,9 @@ progress {
     gap: 6px;
 }
 .album-list li { display: flex; align-items: center; gap: 10px; }
+/* Title + rename button travel together; the input replaces the title in place. */
+.title-cell { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.album-title[hidden] { display: none; }
 .album-list time { color: var(--muted); font-size: 12px; }
 .album-list form.inline { margin-left: auto; }
 
@@ -420,11 +423,16 @@ progress {
 }
 .edit-caption {
     font-size: 11px;
-    color: var(--muted);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    color: var(--text);
+    width: 100%;
+    min-width: 0;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
 }
+.edit-caption:hover { border-color: var(--border); }
+.edit-caption:focus { border-color: var(--accent); background: #1b2024; outline: none; }
 .edit-item .clear {
     position: absolute;
     top: 4px;
@@ -476,3 +484,45 @@ progress {
 .admin-badge { background: var(--accent); color: #fff; border-color: transparent; }
 .admin-private { background: #b45309; color: #fff; border-color: transparent; }
 .admin-unlisted { background: #0e7490; color: #fff; border-color: transparent; }
+
+/* Pagination (pagination/default.blade.php) */
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    font-size: 13px;
+}
+.pagination-summary { margin: 0; color: var(--muted); }
+.pagination-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel-2);
+    color: var(--text);
+    text-decoration: none;
+}
+.page-link:hover { border-color: var(--accent); text-decoration: none; }
+.page-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.page-link.is-current { background: var(--accent); border-color: var(--accent); color: #fff; }
+.page-link.is-disabled { background: transparent; color: var(--muted); opacity: .6; }
+.page-link.is-disabled:hover { border-color: var(--border); }
+.page-ellipsis { padding: 0 4px; color: var(--muted); }
+
+.mine-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.mine-head h1 { margin: 0; }
+.mine-head .btn { margin-left: auto; }

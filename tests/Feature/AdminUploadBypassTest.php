@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Album;
 use App\Models\User;
 use App\Services\RemoteImageFetcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,7 +106,7 @@ class AdminUploadBypassTest extends TestCase
         $response = $this->postAs($this->admin, $images);
         $response->assertStatus(201);
         Storage::disk('public')->assertExists(
-            \App\Models\Album::firstOrFail()->images[0]['key']
+            Album::firstOrFail()->images[0]['key']
         );
     }
 

@@ -5,16 +5,24 @@
 @section('content')
 <div class="page">
     <div class="panel">
-        <h1>My albums</h1>
+        <div class="mine-head">
+            <h1>My albums</h1>
+            @if($albums->total() > 0)
+                <a class="btn" href="{{ route('albums.download') }}" download
+                   title="Download all {{ $albums->total() }} albums as a zip">Download all (zip archive)</a>
+            @endif
+        </div>
         @if($albums->isEmpty())
             <p class="hint">You have not saved any albums yet — build a comparison on the home page and press "Save album".</p>
         @else
             <ul class="album-list">
                 @foreach($albums as $album)
                     <li>
-                        <a class="album-title" data-id="{{ $album->id }}" data-value="{{ $album->title ?? '' }}"
-                           href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
-                        <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998;</button>
+                        <span class="title-cell">
+                            <a class="album-title" data-id="{{ $album->id }}" data-value="{{ $album->title ?? '' }}"
+                               href="{{ route('album', $album) }}">{{ $album->title ?? 'Untitled' }}</a>
+                            <button type="button" class="rename-title" data-id="{{ $album->id }}" title="Rename album">&#9998;</button>
+                        </span>
                         <label class="publicity">
                             <select class="publicity-toggle" data-id="{{ $album->id }}" aria-label="Visibility">
                                 <option value="public" @selected($album->visibility === 'public')>Public</option>
@@ -32,6 +40,7 @@
                     </li>
                 @endforeach
             </ul>
+            {{ $albums->links('pagination.default', ['label' => 'Albums']) }}
         @endif
     </div>
 </div>

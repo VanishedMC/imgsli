@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $disk = Storage::disk('public');
-        $dir = 'albums/'.$album->id;
+        $dir = 'albums/'.$user->id;
         $stored = [];
 
         $hue = 200;

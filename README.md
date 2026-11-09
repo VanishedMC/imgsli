@@ -74,13 +74,14 @@ Log in with Discord to save your comparisons as albums and share them by link.
 | `GET /mine` | Discord | Your albums (all visibilities) with a rename, a visibility picker and delete. |
 | `POST /api/albums` | Discord | Multipart: `title`, `visibility` (`public` default, `unlisted`, `private`), and per image `images[n].file` **or** `images[n].url` (2–8 images, 16 for admin users; png/jpg/gif/webp, ≤10 MB — ≤50 MB for admin users). URL images are fetched server-side with SSRF protection (public IPs only, checked per redirect hop). |
 | `PATCH /api/albums/{album}` | owner **or admin** | JSON `{visibility: "public" | "unlisted" | "private"}` and/or `{title}` (rename; `null` clears it) — at least one field required. |
-| `PUT /api/albums/{album}/images` | owner **or admin** | Multipart: replaces the image list. Each entry is `images[n].key` (keep an existing image), **or** `images[n].file` / `images[n].url` (new); `images[n].description` sets the caption. Count/size limits apply as on create; removed files are deleted. |
+| `PUT /api/albums/{album}/images` | owner **or admin** | Multipart: replaces the image list. Each entry is `images[n].key` (keep an existing image), **or** `images[n].file` / `images[n].url` (new); `images[n].description` sets the caption (send it empty to clear it; omit it to keep it). Count/size limits apply as on create; removed files are deleted. Because PHP only parses multipart bodies on `POST`, send this as `POST` with `_method=PUT` (Laravel method override) — the built-in editor does. |
 | `DELETE /api/albums/{album}` | owner **or admin** | Deletes the album and its stored files. |
 | `GET /auth/discord`, `GET /auth/discord/callback` | — | Socialite Discord login (upsert by `discord_id`). |
 | `POST /logout` | — | |
 
-Album storage keys are random hex under `albums/{ulid}/…` — user input never
-reaches storage paths.
+Album storage keys are random hex under `albums/{user id}/{32-hex}.{ext}` —
+user input never reaches storage paths (the seeder likewise stores under
+`albums/{user id}`).
 
 ## Setup
 
@@ -227,7 +228,7 @@ docker compose up -d --build
   recompile automatically, JS/CSS are served from `public/`. A rebuild is
   only needed when `composer.json` / `composer.lock` / the Dockerfile change.
 - **Tests** run in a one-off service against a separate `imgsli_test`
-  database (created by `docker/db-init-test.sql` on first db init) — the app
+  database (created by `docker/db-init-test.sh` on first db init) — the app
   database is never touched. `phpunit.xml` only fills env vars that aren't
   already set, and the dev `.env` points at the app database, so the test
   service sets its values explicitly:
@@ -240,6 +241,11 @@ docker compose up -d --build
 - **Data.** The dev file keeps MySQL data and album images in named volumes
   (`db_data`, `storage_data`) instead of the production file's `./db` /
   `./storage/app` bind mounts, so the repo directory stays code-only.
+- **Artisan shell.** Use `docker compose exec --user www-data web sh`, or
+  run commands directly with `docker compose exec --user www-data web php artisan …`.
+  This keeps logs and cache files writable by PHP-FPM instead of creating
+  root-owned files. Startup also repairs ownership of `storage` and
+  `bootstrap/cache` (including the dev bind-mounted cache directory).
 - **Never apply the dev file to a production host** — it bind-mounts the
   working tree, so uncommitted edits would go live.
 
@@ -263,6 +269,45 @@ Saving albums uses a Discord account via OAuth. To enable it:
 3. No bot or permissions are needed — it's plain OAuth user login. Anonymous
    visitors can still use the compare tool; only *saving* requires a login.
 
+## Admin users
+
+There is no self-service promotion: `users.is_admin` defaults to `false`, and
+the admin role is granted directly in the database. Promote the account that
+owns the deployment (Discord usernames are unique enough for this; `discord_id`
+is the stable key):
+
+```sql
+-- by Discord username
+UPDATE users SET is_admin = 1 WHERE username = 'your-discord-name';
+
+-- or by Discord ID
+UPDATE users SET is_admin = 1 WHERE discord_id = '123456789012345678';
+```
+
+In Docker:
+
+```bash
+docker compose exec db mysql -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" \
+  -e "UPDATE users SET is_admin = 1 WHERE username = 'your-discord-name';"
+```
+
+(or use the MySQL client of your choice against the same database). Log in
+again after promoting — the `admin` middleware reads the column on every
+request, so a reload is enough; the header gains an **Admin** link to
+`/admin`.
+
+Admins can:
+
+- open `/admin` — every user and every album, private ones included;
+- open, rename, re-photograph and delete **any** album, not just their own;
+- upload larger albums: the effective caps are
+  `max(UPLOAD_MAX_IMAGES, UPLOAD_ADMIN_MAX_IMAGES)` images and
+  `max(UPLOAD_MAX_IMAGE_BYTES, UPLOAD_ADMIN_MAX_IMAGE_BYTES)` bytes per image
+  (16 images / 50 MB by default), and the Docker entrypoint sizes nginx and
+  PHP from the same higher values.
+
+Revoke with `UPDATE users SET is_admin = 0 WHERE …` and a reload.
+
 ## Storage: local vs S3
 
 All album image URLs go through `Storage::disk('public')->url($key)`, so
@@ -272,11 +317,19 @@ switching backends is env-only:
 # local (default): storage/app/public + storage:link (the entrypoint runs it)
 STORAGE_DISK=local
 
-# s3: bucket name in STORAGE_DISK_ROOT (or AWS_BUCKET), credentials in AWS_*,
-# and the public base URL:
+# s3: bucket in STORAGE_DISK_ROOT (or AWS_BUCKET), credentials in AWS_*,
+# the public base URL in STORAGE_DISK_URL, and optionally a key prefix
+# (applied only for s3; the local disk uses STORAGE_DISK_ROOT as its path):
 STORAGE_DISK=s3
+STORAGE_DISK_ROOT=my-imgsli-bucket
+STORAGE_DISK_PREFIX=albums
 STORAGE_DISK_URL=https://cdn.example.com
 ```
+
+The disk is built differently per driver (`config/filesystems.php`): the S3
+variant needs a `bucket` (S3 has no notion of a filesystem root path), so
+`STORAGE_DISK_ROOT` is the bucket there and the local path here. Writes raise
+on failure — an album is never created when its files could not be stored.
 
 With S3 the `storage/app` bind mount goes unused.
 
@@ -295,6 +348,7 @@ variables:
 | `UPLOAD_MAX_IMAGE_BYTES` | `10485760` | per-image size cap, for file uploads **and** URL fetches |
 | `UPLOAD_ADMIN_MAX_IMAGE_BYTES` | `52428800` | per-image size cap for **admin** users (bypasses the regular cap; effective cap is the higher of the two) |
 | `UPLOAD_MAX_URL_LENGTH` | `2048` | max length of a pasted image URL |
+| `UPLOAD_MAX_IMAGE_SIDE` | `16384` | max pixels per side of a stored image (both dimensions; rejects images that would exhaust viewers' browsers) |
 | `UPLOAD_STORE_RATE` | `10,1` | saves per minute per user |
 
 All upload limits are centralized in `config/uploads.php` and driven by the
@@ -305,11 +359,14 @@ All upload limits are centralized in `config/uploads.php` and driven by the
 
 `tests/Feature` (PHPUnit) cover page rendering (compare; public, unlisted and
 private album access), album creation (file, URL, mixed), image editing
-(add/remove by key, files and URLs), validation failures, URL-SSRF
-rejection, rename, delete, and the Discord callback upsert. Run with `php artisan test`
-against a separate `imgsli_test` database (see `phpunit.xml`) — or in the
-Docker dev setup, `docker compose run --rm test`
-([3c](#3c-docker-development-dev-machine)).
+(add/remove by key, files and URLs; captions, including clearing; the
+method-spoofed multipart request the browser sends), validation failures,
+URL-SSRF rejection (including relative redirects), the server-side pixel cap,
+a failing disk write, rename, delete, and the Discord callback upsert. Run
+with `php artisan test` against a separate `imgsli_test` database (see
+`phpunit.xml`) — or in the Docker dev setup, `docker compose run --rm test`
+([3c](#3c-docker-development-dev-machine)). CI runs the same suite plus
+`pint --test`.
 
 ## Repo layout
 
@@ -321,7 +378,7 @@ public/js/album.js               # album page wiring
 public/js/album-edit.js          # add/remove images (owner/admin)
 public/js/publicity.js           # shared visibility picker (mine + album)
 public/js/rename.js              # shared inline rename (mine + album)
-docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sql
+docker/Dockerfile nginx.conf supervisord.conf entrypoint.sh db-init-test.sh
 docker-compose.yml docker-compose.dev.yml    # base (prod) + dev config
 tests/
 ```

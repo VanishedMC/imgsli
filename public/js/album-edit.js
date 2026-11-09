@@ -53,9 +53,16 @@
       img.alt = item.description || `Image ${index + 1}`;
       img.loading = 'lazy';
 
-      const caption = document.createElement('span');
+      const caption = document.createElement('input');
+      caption.type = 'text';
       caption.className = 'edit-caption';
-      caption.textContent = item.description || `Image ${index + 1}`;
+      caption.maxLength = 200;
+      caption.placeholder = 'Caption (optional)';
+      caption.value = item.description ?? '';
+      caption.setAttribute('aria-label', `Caption for image ${index + 1}`);
+      // Kept on the item so adding/removing another image does not lose it;
+      // an empty value is sent as '' and clears the stored caption.
+      caption.addEventListener('input', () => { item.description = caption.value; });
 
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -114,17 +121,23 @@
       } else {
         data.append(`images[${index}][url]`, item.url);
       }
-      if (item.description) {
-        data.append(`images[${index}][description]`, item.description);
-      }
+      // Always sent, empty included: the server treats a missing field as
+      // "keep the stored caption", so omitting it would make clearing a
+      // caption impossible.
+      data.append(`images[${index}][description]`, item.description ?? '');
     });
+
+    // PHP only parses multipart/form-data for POST, so a real PUT arrives with
+    // no fields at all. Send POST plus Laravel's method override; the route
+    // stays PUT /api/albums/{album}/images.
+    data.append('_method', 'PUT');
 
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
 
     try {
       const res = await fetch(`/api/albums/${panel.dataset.id}/images`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           Accept: 'application/json',
           'X-CSRF-TOKEN': csrf,

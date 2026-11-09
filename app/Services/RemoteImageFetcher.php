@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use finfo;
+use GuzzleHttp\Psr7\Exception\MalformedUriException;
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -86,14 +89,21 @@ class RemoteImageFetcher
     /**
      * @param  float|null  $deadline  Unix time (microtime) by which this fetch
      *                                must have finished; null = no deadline.
-     * @param  int|null    $maxBytesOverride  Per-call cap in bytes (e.g. an
-     *                                admin bypass); null = this->maxBytes().
+     * @param  int|null  $maxBytesOverride  Per-call cap in bytes (e.g. an
+     *                                      admin bypass); null = this->maxBytes().
      * @return array{0: string, 1: string} [bytes, extension]
      *
      * @throws ValidationException when the URL or its content is rejected
      */
     public function fetch(string $url, ?float $deadline = null, ?int $maxBytesOverride = null): array
     {
+        // The SSRF protection pins the validated address with CURLOPT_RESOLVE.
+        // Guzzle's stream handler ignores that option, which would silently
+        // reopen the DNS-rebinding window; refuse to fetch without curl.
+        if (! extension_loaded('curl')) {
+            throw new \RuntimeException('Fetching image URLs requires the PHP curl extension.');
+        }
+
         $maxBytes = $maxBytesOverride ?? $this->maxBytes();
         $location = $url;
 
@@ -136,8 +146,15 @@ class RemoteImageFetcher
                 if ($next === null || $next === '') {
                     throw $this->error('Could not fetch the image.');
                 }
-                if (! preg_match('#^https?://#i', $next)) {
-                    $next = $scheme.'://'.$parsed['host'].($parsed['port'] ? ':'.$parsed['port'] : '').'/'.ltrim($next, '/');
+                if (! preg_match('#^[a-z][a-z0-9+.\-]*://#i', $next)) {
+                    // Relative reference (path, ../, query-only, //host): resolve
+                    // it against the URL just requested. The next hop is
+                    // re-validated at the top of the loop either way.
+                    try {
+                        $next = (string) UriResolver::resolve(new Uri($location), new Uri($next));
+                    } catch (MalformedUriException) {
+                        throw $this->error('Could not fetch the image.');
+                    }
                 }
                 $location = $next;
 
